@@ -1,0 +1,12 @@
+// Machines not assessed in the last 7 days
+// Stale assessments indicate the machine may be offline or the agent is unhealthy
+patchassessmentresources
+| where type =~ 'microsoft.compute/virtualmachines/patchassessmentresults'
+    or type =~ 'microsoft.hybridcompute/machines/patchassessmentresults'
+| extend machineId   = tostring(split(id, '/patchAssessmentResults')[0])
+| extend machineName = tostring(split(machineId, '/')[-1])
+| extend resourceType = iff(type contains 'hybridcompute', 'Arc', 'Azure VM')
+| extend lastAssessed = todatetime(properties.lastModifiedDateTime)
+| where lastAssessed < ago(7d)
+| project machineName, resourceType, lastAssessed, daysSinceAssessment = datetime_diff('day', now(), lastAssessed)
+| order by daysSinceAssessment desc

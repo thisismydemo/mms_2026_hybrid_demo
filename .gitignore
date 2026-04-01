@@ -1,0 +1,17 @@
+# Artifacts and local output
+artifacts/
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Editor files
+.vscode/
+*.swp
+*.swo
+*~
+
+# Secrets
+*.env
+*.secret

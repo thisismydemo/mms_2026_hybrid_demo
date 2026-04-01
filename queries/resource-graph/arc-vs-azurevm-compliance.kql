@@ -1,0 +1,20 @@
+// Compare compliance between Arc-enabled servers and Azure VMs
+// Great for showing "single pane of glass" value in demos
+patchassessmentresources
+| where type =~ 'microsoft.compute/virtualmachines/patchassessmentresults'
+    or type =~ 'microsoft.hybridcompute/machines/patchassessmentresults'
+| extend machineId   = tostring(split(id, '/patchAssessmentResults')[0])
+| extend machineName = tostring(split(machineId, '/')[-1])
+| extend resourceType = iff(type contains 'hybridcompute', 'Arc', 'Azure VM')
+| extend osType       = tostring(properties.osType)
+| extend critical     = toint(properties.availablePatchCountByClassification.critical)
+| extend security     = toint(properties.availablePatchCountByClassification.security)
+| extend other        = toint(properties.availablePatchCountByClassification.other)
+| extend lastAssessed = todatetime(properties.lastModifiedDateTime)
+| summarize
+    machineCount   = dcount(machineId),
+    totalCritical  = sum(critical),
+    totalSecurity  = sum(security),
+    avgDaysSinceAssessment = avg(datetime_diff('day', now(), lastAssessed))
+  by resourceType, osType
+| order by resourceType asc, osType asc

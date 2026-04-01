@@ -1,0 +1,15 @@
+// Machines with pending Critical or Security updates
+// Use in Azure Resource Graph Explorer
+patchassessmentresources
+| where type =~ 'microsoft.compute/virtualmachines/patchassessmentresults'
+    or type =~ 'microsoft.hybridcompute/machines/patchassessmentresults'
+| extend machineId   = tostring(split(id, '/patchAssessmentResults')[0])
+| extend machineName = tostring(split(machineId, '/')[-1])
+| extend resourceType = iff(type contains 'hybridcompute', 'Arc', 'Azure VM')
+| extend osType       = tostring(properties.osType)
+| extend critical     = toint(properties.availablePatchCountByClassification.critical)
+| extend security     = toint(properties.availablePatchCountByClassification.security)
+| extend lastAssessed = todatetime(properties.lastModifiedDateTime)
+| where critical > 0 or security > 0
+| project machineName, resourceType, osType, critical, security, lastAssessed
+| order by critical desc, security desc
