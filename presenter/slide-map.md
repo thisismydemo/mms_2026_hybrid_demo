@@ -52,9 +52,9 @@
 
 | Slide | Title | Purpose |
 |-------|-------|---------|
-| 51 | SECTION HEADER — "Compliance & Cost Control" | |
-| 52 | Unified compliance dashboard | Screenshot |
-| 53 | Sample Resource Graph queries | Copy-paste ready |
-| 54 | Cost breakdown | Free vs. paid vs. hidden costs |
-| 55 | **DEMO TRANSITION** | |
+| 54 | SECTION HEADER — "Compliance & Cost Control" | |
+| 55 | Unified compliance dashboard | Screenshot |
+| 56 | Sample Resource Graph queries | Copy-paste ready |
+| 57 | Cost breakdown | Free vs. paid vs. hidden costs |
+| 58 | **DEMO TRANSITION** | |
 | **→ DEMO** | Live in Azure portal | Compliance view, Resource Graph, Policy, Cost Analysis |

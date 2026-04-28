@@ -256,14 +256,14 @@ Slides 33–35 set up the value proposition: 8 months of no-reboot security patc
 ## Demo 5: Compliance & Reporting (~3 min)
 
 ### Corresponding Slides
-- **Slide 51**: SECTION HEADER — "Compliance, Reporting & Cost Control"
-- **Slide 52**: Unified compliance dashboard screenshot
-- **Slide 53**: Sample Azure Resource Graph queries (copy-paste ready)
-- **Slide 54**: Cost breakdown — what's free, what costs, where the hidden costs live
-- **Slide 55**: DEMO TRANSITION — Compliance & Reporting
+- **Slide 54**: SECTION HEADER — "Compliance, Reporting & Cost Control"
+- **Slide 55**: Unified compliance dashboard screenshot
+- **Slide 56**: Sample Azure Resource Graph queries (copy-paste ready)
+- **Slide 57**: Cost breakdown — what's free, what costs, where the hidden costs live
+- **Slide 58**: DEMO TRANSITION — Compliance & Reporting
 
 ### Pre-Demo Slide Context
-Slides 52–54 cover the reporting capabilities (Resource Graph, Policy, Workbooks), sample queries, and the cost model (Update Manager free for Azure VMs, $5/server/month for Arc, hidden Log Analytics ingestion costs). The demo ties it all together with live views.
+Slides 55–57 cover the reporting capabilities (Resource Graph, Policy, Workbooks), sample queries, and the cost model (Update Manager free for Azure VMs, $5/server/month for Arc, hidden Log Analytics ingestion costs). The demo ties it all together with live views.
 
 ### Step-by-Step Walkthrough
 
@@ -343,5 +343,5 @@ Slides 52–54 cover the reporting capabilities (Resource Graph, Policy, Workboo
 | 1. AUM Overview | After Slide 13 | "Now you've seen the tool — let's talk about how your on-prem servers get into it." | → Slides 14–18 (Arc) |
 | 2. Arc & Readiness | After Slide 19 | "So that's how individual servers get managed. But Azure Local clusters? That's a different beast entirely." | → Slides 20–25 (Azure Local) |
 | 3. Azure Local Updates | After Slide 26 | "Now let's talk about something everyone wants — fewer reboots." | → Slides 32–35 (Hotpatching) |
-| 4. Hotpatching | After Slide 36 | "So we can patch smarter, reboot less — but can we prove it? Let's look at compliance." | → Slides 51–54 (Compliance) |
-| 5. Compliance & Reporting | After Slide 55 | "That's the full picture — one control plane, many engines, full visibility." | → Slides 56+ (WSUS / Wrap-up) |
+| 4. Hotpatching | After Slide 36 | "So we can patch smarter, reboot less — but can we prove it? Let's look at compliance." | → Slides 54–57 (Compliance) |
+| 5. Compliance & Reporting | After Slide 58 | "That's the full picture — one control plane, many engines, full visibility." | → Slides 59+ (WSUS / Wrap-up) |

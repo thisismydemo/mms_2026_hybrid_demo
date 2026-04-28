@@ -60,16 +60,16 @@ End-to-end demo repository for the **"The Hybrid Update Blues: Patching Everythi
 
 ```powershell
 # 1. Validate your demo environment
-.\scripts\01-prepare-demo-environment.ps1 -SubscriptionId "<sub-id>" -ResourceGroupName "rg-hybrid-demo"
+.\.scripts\01-prepare-demo-environment.ps1 -SubscriptionId "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" -ResourceGroupName "rg-c01-azl-eus-01"
 
 # 2. Create maintenance configurations
-.\scripts\02-create-maintenance-configurations.ps1 -SubscriptionId "<sub-id>" -ResourceGroupName "rg-hybrid-demo"
+.\.scripts\02-create-maintenance-configurations.ps1 -SubscriptionId "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" -ResourceGroupName "rg-c01-azl-eus-01"
 
 # 3. Tag machines for dynamic scoping
-.\scripts\03-tag-update-rings.ps1 -SubscriptionId "<sub-id>" -ResourceGroupName "rg-hybrid-demo" -Ring "Ring1"
+.\.scripts\03-tag-update-rings.ps1 -SubscriptionId "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" -ResourceGroupName "rg-c01-azl-eus-01" -Ring "Ring1"
 
 # 4. Collect fallback artifacts
-.\scripts\06-collect-demo-artifacts.ps1 -SubscriptionId "<sub-id>" -ResourceGroupName "rg-hybrid-demo"
+.\.scripts\06-collect-demo-artifacts.ps1 -SubscriptionId "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" -ResourceGroupName "rg-c01-azl-eus-01"
 ```
 
 ## Demo Flow (5 Demos, ~17 Minutes)
@@ -84,6 +84,39 @@ End-to-end demo repository for the **"The Hybrid Update Blues: Patching Everythi
 
 See [Demo-Guide-Hybrid-Update-Blues.md](Demo-Guide-Hybrid-Update-Blues.md) for the full walkthrough.
 
+## Supporting Infrastructure vs. Demo Content
+
+This repo separates **what must be running before the session starts** from **what is deployed or shown live**.
+
+### Supporting Infrastructure — Deploy Before the Session
+
+These components must be deployed and validated **days before** MMS MOA 2026. They are not live-deployed on stage.
+
+| Component | Location | Purpose |
+|---|---|---|
+| Azure Local cluster (`tplabs-clus01`) | Pre-existing — do not redeploy | Provides the on-premises compute substrate |
+| Arc-enrolled demo VMs | `scripts/01-prepare-demo-environment.ps1` | Verify Arc-enrolled machines are healthy before demos |
+| Maintenance configurations | `scripts/02-create-maintenance-configurations.ps1` | Pre-create Ring 1/2/Defender configs |
+
+```powershell
+# Pre-session setup:
+.\scripts\01-prepare-demo-environment.ps1
+.\scripts\02-create-maintenance-configurations.ps1
+.\scripts\03-tag-update-rings.ps1
+```
+
+### Demo Content — Shown Live
+
+These are portal walkthroughs, KQL queries, and policy actions demonstrated on stage against the pre-deployed infrastructure.
+
+| Demo | Tool | Script / Query |
+|---|---|---|
+| 1 — Azure Update Manager overview | Azure Portal | — |
+| 2 — Arc onboarding & update readiness | Arc blade, Resource Graph | `queries/resource-graph/not-assessed-last-7-days.kql` |
+| 3 — Azure Local update management | Azure Update Manager | `queries/resource-graph/pending-critical-updates.kql` |
+| 4 — Hotpatching on WS2025 | Arc hotpatch blade | `scripts/05-validate-hotpatch-readiness.ps1` |
+| 5 — Compliance & reporting | Azure Policy, Resource Graph | `queries/resource-graph/arc-vs-azurevm-compliance.kql` |
+
 ## Presenter Resources
 
 - [Run of Show](presenter/run-of-show.md) — Timing plan for the full session
@@ -96,7 +129,9 @@ See [Demo-Guide-Hybrid-Update-Blues.md](Demo-Guide-Hybrid-Update-Blues.md) for t
 After the session, remove demo resources:
 
 ```powershell
-az group delete --name "rg-hybrid-demo" --yes --no-wait
+# Remove demo-specific resource groups (does NOT delete the pre-existing cluster)
+az group delete --name "rg-arc-demo" --subscription "00cd4357-ed45-4efb-bee0-10c467ff994b" --yes --no-wait
+az group delete --name "rg-arc-test-vms" --subscription "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" --yes --no-wait
 ```
 
 ## License
