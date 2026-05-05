@@ -16,10 +16,7 @@ on:
           - Standard_E104ids_v5
           - Standard_E96ds_v5
           - Standard_E64ds_v5
-  push:
-    branches: [main]
-    paths:
-      - "hyperv-cluster-demo/bicep/**"
+
 
 env:
   SUBSCRIPTION_ID: "00cd4357-ed45-4efb-bee0-10c467ff994b"
