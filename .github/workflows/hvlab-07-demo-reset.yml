@@ -1,0 +1,79 @@
+name: "HVLab 07 — Demo Reset (Restore Checkpoints)"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RUN THIS ON DEMO DAY to restore all nested VMs to the DEMO-READY checkpoint.
+# Takes approx 5-10 minutes. Trigger manually before each session.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      checkpoint_name:
+        description: "Checkpoint to restore"
+        required: true
+        default: "DEMO-READY"
+        type: choice
+        options:
+          - DEMO-READY
+          - PRE-DEMO-1
+          - PRE-DEMO-2
+
+jobs:
+  demo-reset:
+    name: "Restore checkpoint: ${{ github.event.inputs.checkpoint_name }}"
+    runs-on: [self-hosted, hvlab-host]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Restore all VMs to checkpoint"
+        shell: pwsh
+        run: |
+          $checkpointName = '${{ github.event.inputs.checkpoint_name }}'
+          Write-Host "Restoring all nested VMs to checkpoint: $checkpointName" -ForegroundColor Cyan
+
+          $vms = Get-VM | Where-Object { $_.Name -like 'hv*' }
+          foreach ($vm in $vms) {
+            $snap = Get-VMSnapshot -VM $vm -Name $checkpointName -ErrorAction SilentlyContinue
+            if ($snap) {
+              Stop-VM -VM $vm -Force -ErrorAction SilentlyContinue
+              Restore-VMSnapshot -VMSnapshot $snap -Confirm:$false
+              Start-VM -VM $vm
+              Write-Host "  ✅ $($vm.Name) → $checkpointName" -ForegroundColor Green
+            } else {
+              Write-Host "  ⚠️  $($vm.Name) — checkpoint '$checkpointName' not found" -ForegroundColor Yellow
+            }
+          }
+
+          Write-Host "`nWaiting 60s for VMs to boot..." -ForegroundColor Gray
+          Start-Sleep 60
+
+          # Quick connectivity check
+          $checks = @{
+            'hvdc01 (DNS)'    = '172.16.10.10'
+            'hvnode01'        = '172.16.10.21'
+            'hvnode02'        = '172.16.10.22'
+            'hvnode03'        = '172.16.10.23'
+            'hvnode04'        = '172.16.10.24'
+            'hvwac01'         = '172.16.10.30'
+            'hvscvmm01'       = '172.16.10.40'
+          }
+
+          foreach ($name in $checks.Keys) {
+            $ip = $checks[$name]
+            $ok = Test-Connection -ComputerName $ip -Count 1 -Quiet
+            $icon = if ($ok) { '✅' } else { '❌' }
+            Write-Host "  $icon $name ($ip)"
+          }
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          "## 🔄 Demo Reset Complete — ${{ github.event.inputs.checkpoint_name }}" |
+            Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "All nested VMs restored and started." | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| Access | URL |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "|---|---|" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| WAC vmode | https://10.250.1.46 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| SCVMM console | Connect via RDP to 10.250.1.47 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append

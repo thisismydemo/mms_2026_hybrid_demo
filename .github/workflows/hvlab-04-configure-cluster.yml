@@ -1,0 +1,40 @@
+name: "HVLab 04 — Configure Failover Cluster"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  configure-cluster:
+    name: Configure iSCSI + Failover Cluster
+    runs-on: [self-hosted, hvlab-host]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Configure iSCSI target and LUNs on hviscsi01"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/01-configure-iscsi.ps1
+
+      - name: "Configure iSCSI initiators on cluster nodes"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/02-configure-iscsi-initiators.ps1
+
+      - name: "Create and configure failover cluster (hvlab-clus01)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/03-configure-cluster.ps1
+
+      - name: "Configure Active Directory objects (OUs, service accounts, groups)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/05-configure-ad.ps1
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          "## ✅ Failover Cluster Configured" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- iSCSI LUNs created on hviscsi01 (3 × 500 GB CSVs)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- MPIO configured on all 4 cluster nodes" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- Cluster **hvlab-clus01** created (nodes: hvnode01-04)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- CSVs added: Volume1, Volume2, Volume3-Templates" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- Cloud Witness configured (sthvlabwitness01)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "**Next step:** Run **HVLab 05 — Configure WAC vmode**" | Out-File $env:GITHUB_STEP_SUMMARY -Append

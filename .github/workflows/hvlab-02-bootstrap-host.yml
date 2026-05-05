@@ -1,0 +1,123 @@
+name: "HVLab 02 — Bootstrap Host VM"
+
+on:
+  workflow_dispatch:
+
+env:
+  SUBSCRIPTION_ID: "00cd4357-ed45-4efb-bee0-10c467ff994b"
+  RESOURCE_GROUP:  "rg-hvlab-mms26-eus-01"
+  VM_NAME:         "vm-hvlab-host01-eus-01"
+  KV_NAME:         "kv-tplabs-platform"
+  KV_SUBSCRIPTION: "2caa0b8a-a1d6-4f0c-8c03-861787b8315c"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Bootstrap Host VM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.SUBSCRIPTION_ID }}
+
+      # ── Phase 1: Install Windows Features ──────────────────────────────────
+      - name: "Phase 1 — Install Windows features (will reboot)"
+        run: |
+          SCRIPT=$(cat hyperv-cluster-demo/scripts/deploy/04-bootstrap-phase1.ps1 | base64 -w 0)
+          az vm run-command invoke \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VM_NAME" \
+            --command-id RunPowerShellScript \
+            --scripts "powershell -EncodedCommand $SCRIPT" \
+            --output json
+          echo "Phase 1 script sent — VM will reboot."
+
+      - name: "Wait for reboot (5 minutes)"
+        run: |
+          echo "Waiting 5 minutes for VM to reboot and come back online..."
+          sleep 300
+
+      - name: "Wait for VM to be running"
+        run: |
+          az vm wait \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VM_NAME" \
+            --updated \
+            --timeout 300
+          echo "VM is back online."
+
+      # ── Get secrets from Key Vault ──────────────────────────────────────────
+      - name: "Get domain join password from Key Vault"
+        id: kv-secrets
+        run: |
+          DOMAIN_PW=$(az keyvault secret show \
+            --vault-name "$KV_NAME" \
+            --subscription "$KV_SUBSCRIPTION" \
+            --name "svc-hvlab-deploy-password" \
+            --query value -o tsv)
+          echo "::add-mask::$DOMAIN_PW"
+          echo "domain_pw=$DOMAIN_PW" >> $GITHUB_OUTPUT
+
+      # ── Phase 2: Configure Hyper-V ─────────────────────────────────────────
+      - name: "Phase 2 — Configure Hyper-V, vSwitches, WinNAT, domain join"
+        run: |
+          az vm run-command invoke \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VM_NAME" \
+            --command-id RunPowerShellScript \
+            --scripts @hyperv-cluster-demo/scripts/deploy/05-bootstrap-phase2.ps1 \
+            --parameters "DomainJoinPassword=${{ steps.kv-secrets.outputs.domain_pw }}" \
+            --output json
+          echo "Phase 2 complete."
+
+      - name: "Wait for domain join reboot"
+        run: sleep 120
+
+      # ── Get GitHub runner token ─────────────────────────────────────────────
+      - name: "Get GitHub runner token from Key Vault"
+        id: runner-token
+        run: |
+          TOKEN=$(az keyvault secret show \
+            --vault-name "$KV_NAME" \
+            --subscription "$KV_SUBSCRIPTION" \
+            --name "hvlab-github-runner-token" \
+            --query value -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "runner_token=$TOKEN" >> $GITHUB_OUTPUT
+
+      # ── Install GitHub runner ───────────────────────────────────────────────
+      - name: "Install GitHub Actions self-hosted runner"
+        run: |
+          az vm run-command invoke \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "$VM_NAME" \
+            --command-id RunPowerShellScript \
+            --scripts @hyperv-cluster-demo/scripts/deploy/06-install-github-runner.ps1 \
+            --parameters "RunnerToken=${{ steps.runner-token.outputs.runner_token }}" \
+            --output json
+          echo "GitHub runner installed."
+
+      - name: Summary
+        run: |
+          echo "## ✅ Host VM Bootstrap Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows features installed (Hyper-V, Failover Clustering, RSAT, iSCSI)" >> $GITHUB_STEP_SUMMARY
+          echo "- Storage pool + D:\\ volume created from 4 × 1 TB disks" >> $GITHUB_STEP_SUMMARY
+          echo "- 6 vSwitches created (External, Mgmt, Migration, Storage, Heartbeat, Workload)" >> $GITHUB_STEP_SUMMARY
+          echo "- WinNAT configured (172.16.0.0/12)" >> $GITHUB_STEP_SUMMARY
+          echo "- Host joined to azrl.mgmt" >> $GITHUB_STEP_SUMMARY
+          echo "- Self-hosted runner **hvlab-host** installed and running" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next step:** Run **HVLab 03 — Deploy Nested VMs**" >> $GITHUB_STEP_SUMMARY

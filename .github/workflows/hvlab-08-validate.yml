@@ -1,0 +1,109 @@
+name: "HVLab 08 — Validate Environment"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate full environment
+    runs-on: [self-hosted, hvlab-host]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Check all nested VMs are running"
+        shell: pwsh
+        run: |
+          $expected = @('hvdc01','hviscsi01','hvnode01','hvnode02','hvnode03','hvnode04','hvwac01','hvscvmm01')
+          $running  = (Get-VM | Where-Object { $_.State -eq 'Running' }).Name
+          $failed = @()
+          foreach ($vm in $expected) {
+            if ($running -contains $vm) {
+              Write-Host "  ✅ $vm — Running" -ForegroundColor Green
+            } else {
+              Write-Host "  ❌ $vm — NOT running" -ForegroundColor Red
+              $failed += $vm
+            }
+          }
+          if ($failed.Count -gt 0) { throw "VMs not running: $($failed -join ', ')" }
+
+      - name: "Check cluster health"
+        shell: pwsh
+        run: |
+          $cluster = Invoke-Command -ComputerName hvnode01 -ScriptBlock {
+            Import-Module FailoverClusters
+            $c = Get-Cluster -Name hvlab-clus01
+            $nodes = Get-ClusterNode -Cluster $c | Select-Object Name, State
+            $csrs  = Get-ClusterSharedVolume -Cluster $c | Select-Object Name, State
+            @{ ClusterName = $c.Name; Nodes = $nodes; CSVs = $csrs }
+          }
+          Write-Host "Cluster: $($cluster.ClusterName)"
+          $cluster.Nodes | ForEach-Object {
+            $icon = if ($_.State -eq 'Up') { '✅' } else { '❌' }
+            Write-Host "  $icon Node: $($_.Name) — $($_.State)"
+          }
+          $cluster.CSVs | ForEach-Object {
+            $icon = if ($_.State -eq 'Online') { '✅' } else { '❌' }
+            Write-Host "  $icon CSV: $($_.Name) — $($_.State)"
+          }
+
+      - name: "Check iSCSI connectivity from nodes"
+        shell: pwsh
+        run: |
+          $nodes = @('hvnode01','hvnode02','hvnode03','hvnode04')
+          foreach ($node in $nodes) {
+            $sessions = Invoke-Command -ComputerName $node -ScriptBlock {
+              Get-IscsiSession | Select-Object -ExpandProperty IsConnected
+            }
+            $ok = ($sessions -contains $true)
+            Write-Host "  $(if($ok){'✅'}else{'❌'}) $node iSCSI: $(if($ok){'Connected'}else{'DISCONNECTED'})"
+          }
+
+      - name: "Check WAC vmode HTTPS"
+        shell: pwsh
+        run: |
+          try {
+            $resp = Invoke-WebRequest -Uri 'https://10.250.1.46' -UseBasicParsing `
+              -SkipCertificateCheck -TimeoutSec 10
+            Write-Host "  ✅ WAC vmode HTTPS (10.250.1.46) — $($resp.StatusCode)"
+          } catch {
+            Write-Host "  ❌ WAC vmode HTTPS unreachable: $_" -ForegroundColor Red
+          }
+
+      - name: "Check SCVMM service"
+        shell: pwsh
+        run: |
+          $svc = Invoke-Command -ComputerName hvscvmm01 -ScriptBlock {
+            Get-Service -Name SCVMMService -ErrorAction SilentlyContinue
+          }
+          $ok = ($svc -and $svc.Status -eq 'Running')
+          Write-Host "  $(if($ok){'✅'}else{'❌'}) SCVMM service: $(if($ok){'Running'}else{'NOT running'})"
+
+      - name: "Take DEMO-READY checkpoint (if all checks pass)"
+        shell: pwsh
+        run: |
+          $vms = Get-VM | Where-Object { $_.Name -like 'hv*' -and $_.State -eq 'Running' }
+          foreach ($vm in $vms) {
+            # Remove old DEMO-READY checkpoint if it exists
+            Get-VMSnapshot -VM $vm -Name 'DEMO-READY' -ErrorAction SilentlyContinue |
+              Remove-VMSnapshot -Confirm:$false -ErrorAction SilentlyContinue
+            # Take fresh checkpoint
+            Checkpoint-VM -VM $vm -SnapshotName 'DEMO-READY'
+            Write-Host "  ✅ Checkpoint 'DEMO-READY' taken for $($vm.Name)"
+          }
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          "## ✅ Environment Validated — DEMO-READY checkpoint taken" |
+            Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "The environment is ready for demo. On demo day, trigger **HVLab 07 — Demo Reset**" |
+            Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "to restore all VMs to this checkpoint in ~5-10 minutes." |
+            Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| Access Point | URL |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "|---|---|" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| WAC vmode | https://10.250.1.46 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| SCVMM | RDP to 10.250.1.47 (hvscvmm01) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| Host VM RDP | 10.250.1.45 (or via public IP) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append

@@ -1,0 +1,112 @@
+name: "HVLab 01 — Deploy Azure Infrastructure"
+
+on:
+  workflow_dispatch:
+    inputs:
+      location:
+        description: "Azure region (run 01-find-best-region.ps1 first)"
+        required: true
+        default: "eastus"
+      vm_size:
+        description: "VM size"
+        required: true
+        default: "Standard_E104ids_v5"
+        type: choice
+        options:
+          - Standard_E104ids_v5
+          - Standard_E96ds_v5
+          - Standard_E64ds_v5
+  push:
+    branches: [main]
+    paths:
+      - "hyperv-cluster-demo/bicep/**"
+
+env:
+  SUBSCRIPTION_ID: "00cd4357-ed45-4efb-bee0-10c467ff994b"
+  RESOURCE_GROUP:  "rg-hvlab-mms26-eus-01"
+  TEMPLATE_FILE:   "hyperv-cluster-demo/bicep/main.bicep"
+  PARAMS_FILE:     "hyperv-cluster-demo/bicep/parameters/tplabs.bicepparam"
+
+permissions:
+  id-token: write   # for OIDC
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy Bicep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.SUBSCRIPTION_ID }}
+
+      - name: Create Resource Group
+        run: |
+          az group create \
+            --subscription "$SUBSCRIPTION_ID" \
+            --name "$RESOURCE_GROUP" \
+            --location "${{ github.event.inputs.location || 'eastus' }}" \
+            --tags environment=lab workload=hvlab-mms26 owner=kristopherjturner \
+                   demoEvent=mms-moa-2026 createdBy=github-actions
+
+      - name: Validate Bicep
+        run: |
+          az deployment group validate \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file "$TEMPLATE_FILE" \
+            --parameters "$PARAMS_FILE" \
+            --parameters location="${{ github.event.inputs.location || 'eastus' }}" \
+                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E104ids_v5' }}"
+
+      - name: Deploy Bicep
+        id: deploy
+        run: |
+          az deployment group create \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --template-file "$TEMPLATE_FILE" \
+            --parameters "$PARAMS_FILE" \
+            --parameters location="${{ github.event.inputs.location || 'eastus' }}" \
+                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E104ids_v5' }}" \
+            --name "hvlab-deploy-${{ github.run_number }}" \
+            --output json | tee /tmp/deploy-output.json
+
+          PUBLIC_IP=$(cat /tmp/deploy-output.json | jq -r '.properties.outputs.publicIpAddress.value')
+          echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
+          echo "✅ Host VM public IP: $PUBLIC_IP"
+
+      - name: Assign Key Vault role to Managed Identity
+        run: |
+          PRINCIPAL_ID=$(az deployment group show \
+            --subscription "$SUBSCRIPTION_ID" \
+            --resource-group "$RESOURCE_GROUP" \
+            --name "hvlab-deploy-${{ github.run_number }}" \
+            --query properties.outputs.identityPrincipalId.value -o tsv)
+
+          KV_ID=$(az keyvault show \
+            --name kv-tplabs-platform \
+            --subscription "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" \
+            --query id -o tsv)
+
+          az role assignment create \
+            --role "Key Vault Secrets User" \
+            --assignee-object-id "$PRINCIPAL_ID" \
+            --assignee-principal-type ServicePrincipal \
+            --scope "$KV_ID"
+
+          echo "✅ Key Vault Secrets User role assigned to managed identity."
+
+      - name: Summary
+        run: |
+          echo "## ✅ Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Group | $RESOURCE_GROUP |" >> $GITHUB_STEP_SUMMARY
+          echo "| Public IP | ${{ steps.deploy.outputs.public_ip }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Next step | Run **HVLab 02 — Bootstrap Host** |" >> $GITHUB_STEP_SUMMARY

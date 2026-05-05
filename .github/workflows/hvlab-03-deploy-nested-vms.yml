@@ -1,0 +1,46 @@
+name: "HVLab 03 — Deploy Nested VMs"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-nested-vms:
+    name: Create all nested VMs
+    runs-on: [self-hosted, hvlab-host]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Create replica DC (hvdc01)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/nested-vms/01-create-dc.ps1
+
+      - name: "Create iSCSI target server (hviscsi01)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/nested-vms/02-create-iscsi.ps1
+
+      - name: "Create Hyper-V cluster nodes (hvnode01-04)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/nested-vms/03-create-cluster-nodes.ps1
+
+      - name: "Create WAC vmode server (hvwac01 — WS2025)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/nested-vms/04-create-wac-vmode.ps1
+
+      - name: "Create SCVMM server (hvscvmm01)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/nested-vms/05-create-scvmm.ps1
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          $vms = Get-VM | Select-Object Name, State, @{N='MemoryGB';E={[math]::Round($_.MemoryAssigned/1GB,1)}}, ProcessorCount
+          $vms | Format-Table | Out-String | Write-Host
+          "## ✅ Nested VMs Created" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| VM | State | Memory | vCPU |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "|---|---|---|---|" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          foreach ($vm in $vms) {
+            "| $($vm.Name) | $($vm.State) | $($vm.MemoryGB) GB | $($vm.ProcessorCount) |" |
+              Out-File $env:GITHUB_STEP_SUMMARY -Append
+          }
+          "`n**Next step:** Run **HVLab 04 — Configure Cluster**" |
+            Out-File $env:GITHUB_STEP_SUMMARY -Append

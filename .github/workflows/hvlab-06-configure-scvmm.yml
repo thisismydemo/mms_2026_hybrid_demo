@@ -1,0 +1,34 @@
+name: "HVLab 06 — Configure SCVMM 2025"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  configure-scvmm:
+    name: Install SQL + SCVMM 2025 on hvscvmm01
+    runs-on: [self-hosted, hvlab-host]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Install SQL Server Developer + SCVMM 2025"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/06-configure-scvmm.ps1
+
+      - name: "Add Hyper-V hosts and cluster to SCVMM"
+        shell: pwsh
+        run: |
+          Write-Host "SCVMM host addition handled inside 06-configure-scvmm.ps1"
+          Write-Host "SCVMM console access: https://10.250.1.47 (hvscvmm01 external IP)"
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          "## ✅ SCVMM 2025 Configured" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- SQL Server Developer Edition installed" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- SCVMM 2025 management server installed" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- Cluster hvlab-clus01 and all nodes added" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- Logical networks configured (Mgmt, Workload)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- SCVMM library share configured" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "**Next step:** Run **HVLab 08 — Validate** then take DEMO-READY checkpoint" | Out-File $env:GITHUB_STEP_SUMMARY -Append

@@ -1,0 +1,658 @@
+# =============================================================================
+# HV-Lab Demo Environment — Variables
+# Version: 1.0.0
+# Scope: MMS MOA 2026 — Nested Hyper-V Cluster Demo
+# Target repo: thisismydemo/mms_2026_hybrid_demo
+# Tenant: TierPoint Product Labs (tplabs)
+# Subscription: 00cd4357-ed45-4efb-bee0-10c467ff994b
+#
+# IMPORTANT — all secrets use keyvault:// URIs only. No plain-text secrets.
+# Pre-stage all secrets in kv-tplabs-platform before running any deployment.
+# See section 10 (key_vault.secrets_required) for the full list.
+#
+# Naming standard: Azure Cloud Adoption Framework (CAF)
+#   <type>-<workload>-<instance>-<region>-<seq>
+#   Storage accounts: st<workload><seq> (no hyphens, max 24 chars, lowercase)
+# =============================================================================
+
+# =============================================================================
+# METADATA
+# =============================================================================
+metadata:
+  schema_version: "1.0.0"
+  environment: lab
+  tenant: tplabs
+  tenant_id: a9b67171-3fbb-45bf-8394-eb56d02a86e4
+  subscription_id: "00cd4357-ed45-4efb-bee0-10c467ff994b"
+  owner: kristopherjturner
+  purpose: "MMS MOA 2026 Nested Hyper-V 4-node cluster demo environment"
+  last_updated: "2025-01"
+
+# =============================================================================
+# 1. DEPLOYMENT APPROACH
+# =============================================================================
+deployment:
+  # Azure infrastructure: Bicep deployed via Azure CLI
+  method: bicep
+  runner: azure_cli              # az deployment group create --template-file main.bicep
+  bicep_main: hyperv-cluster-demo/bicep/main.bicep
+  bicep_params: hyperv-cluster-demo/bicep/parameters/tplabs.bicepparam
+
+  # Host VM initial configuration: Custom Script Extension (CSE)
+  # CSE runs bootstrap.ps1 which: installs Hyper-V, configures vSwitches,
+  # sets up WinNAT, joins domain, installs GitHub self-hosted runner service
+  bootstrap: custom_script_extension
+  bootstrap_script: hyperv-cluster-demo/scripts/deploy/03-bootstrap-host-vm.ps1
+
+  # All subsequent nested-VM and cluster work: GitHub Actions (self-hosted runner)
+  # The self-hosted runner (label: hvlab-host) is installed by the CSE bootstrap script.
+  # Workflows in .github/workflows/hvlab-*.yml run on this runner.
+  automation: github_actions
+  github_runner_label: hvlab-host
+
+  # DSC / Arc: NOT used for this deployment
+  # - DSC v3: skipped (straight PowerShell is simpler for a demo environment)
+  # - Azure Arc on host: skipped (Arc is overkill for a single-VM demo host)
+  # - Arc can be added post-demo if desired for Arc-enabled Server demo stories
+
+  azure_context:
+    tenant_id: a9b67171-3fbb-45bf-8394-eb56d02a86e4
+    subscription_id: "00cd4357-ed45-4efb-bee0-10c467ff994b"
+
+# =============================================================================
+# 2. AZURE PLATFORM
+# =============================================================================
+azure_platform:
+  # UPDATE: run hyperv-cluster-demo/scripts/deploy/01-find-best-region.ps1
+  # to confirm which region has sufficient EDSv5 family quota.
+  region: eastus
+  region_short: eus
+  resource_group: rg-hvlab-mms26-eus-01    # CAF: rg-<workload>-<env>-<region>-<seq>
+
+# =============================================================================
+# 3. NETWORKING — USE EXISTING VNET/SUBNET (do not create new ones)
+# =============================================================================
+# WHY EXISTING SUBNET:
+#   The existing BGP session (FortiGate-90G ASN 65421 ↔ Azure VPN GW ASN 65422)
+#   already advertises 10.250.0.0/16 to on-prem. Any VM placed on the existing
+#   management subnet is automatically reachable from the Azure Local cluster
+#   (192.168.211.x) and all on-prem resources — no UDR or extra routing needed.
+azure_networking:
+  use_existing_vnet: true
+  vnet_name: vnet-lab-prodtech-eus-connectivity-hub
+  vnet_resource_group: rg-c01-hub-eus-01       # existing hub RG (tplabs)
+  vnet_address_space: 10.250.0.0/16
+  subnet:
+    name: snet-lab-prodtech-eus-connectivity-mgmt
+    address_prefix: 10.250.1.0/24
+  existing_dns_servers:
+    - 10.250.1.36    # DC1 (azrl.mgmt) — existing
+    - 10.250.1.37    # DC2 (azrl.mgmt) — existing
+  # IPs to verify free before deployment (run 02-verify-ip-availability.ps1)
+  ip_allocation:
+    hvlab_host01:  10.250.1.45    # host VM primary IP
+    hvlab_wac01:   10.250.1.46    # secondary NIC IP → routes to hvwac01 nested VM
+    hvlab_scvmm01: 10.250.1.47    # secondary NIC IP → routes to hvscvmm01 nested VM
+    hvlab_reserve: 10.250.1.48    # reserved
+
+# =============================================================================
+# 4. HOST VM — Azure resource (CAF naming)
+# =============================================================================
+host_vm:
+  # CAF name format: <type>-<workload>-<instance>-<region>-<seq>
+  azure_resource_name: vm-hvlab-host01-eus-01
+  nic_name:            nic-hvlab-host01-eus-01
+  public_ip_name:      pip-hvlab-host01-eus-01
+  public_ip_sku:       Standard
+  public_ip_allocation: Static
+  nsg_name:            nsg-hvlab-host01-eus-01
+  os_disk_name:        disk-hvlab-host01-os-eus-01
+  managed_identity:    mi-hvlab-host01-eus-01
+
+  # VM sizing — E104ids_v5: 104 vCPU / 672 GB RAM / ISOLATED hardware
+  # Total nested allocation: 82 vCPU / 320 GB → 22 vCPU + 352 GB headroom
+  # Isolated = dedicated physical host (no noisy neighbors — ideal for nested virtualization demos)
+  # Local NVMe ~3.8 TB: copy VHDXes from data disks to NVMe on demo day for fast I/O
+  # Microsoft docs explicitly recommend isolated VM sizes for nested virtualization workloads
+  size:          Standard_E104ids_v5    # preferred: isolated, 104 vCPU, local NVMe
+  size_fallback: Standard_E96ds_v5     # fallback: 96 vCPU (shared hardware)
+  size_last_resort: Standard_E64ds_v5  # last resort: 64 vCPU (reduce node vCPUs to 12)
+
+  os:
+    publisher: MicrosoftWindowsServer
+    offer:     WindowsServer
+    sku:       2022-datacenter-g2
+    version:   latest
+  os_disk_size_gb:   256
+  os_disk_sku:       Premium_LRS
+
+  data_disks:
+    - name: disk-hvlab-host01-data-eus-01
+      size_gb: 1024
+      sku:     Premium_LRS
+      lun:     0
+    - name: disk-hvlab-host01-data-eus-02
+      size_gb: 1024
+      sku:     Premium_LRS
+      lun:     1
+    - name: disk-hvlab-host01-data-eus-03
+      size_gb: 1024
+      sku:     Premium_LRS
+      lun:     2
+    - name: disk-hvlab-host01-data-eus-04
+      size_gb: 1024
+      sku:     Premium_LRS
+      lun:     3
+
+  private_ip:            10.250.1.45
+  private_ip_allocation: Static
+  ip_forwarding:         true       # required: Azure delivers secondary IP traffic to host
+  accelerated_networking: true      # required by Edsv5 series
+
+  # Secondary IPs on the host NIC — allows nested VMs to have Azure-subnet-routable IPs
+  # IP forwarding on the NIC + Windows routing on host delivers traffic to nested VMs
+  secondary_ips:
+    - name:       ipconfig-hvwac01
+      private_ip: 10.250.1.46
+      allocation: Static
+    - name:       ipconfig-hvscvmm01
+      private_ip: 10.250.1.47
+      allocation: Static
+
+  admin_username: hvlabadmin
+  admin_password: keyvault://kv-tplabs-platform/hvlab-host01-admin-password
+
+  nsg_rules:
+    - name:                  AllowRDP-VNet
+      priority:              100
+      direction:             Inbound
+      access:                Allow
+      protocol:              Tcp
+      destination_port:      3389
+      source_address_prefix: VirtualNetwork
+    - name:                  AllowWinRM-VNet
+      priority:              110
+      direction:             Inbound
+      access:                Allow
+      protocol:              Tcp
+      destination_port_range: "5985-5986"
+      source_address_prefix: VirtualNetwork
+    - name:                  AllowHTTPS-VNet
+      priority:              120
+      direction:             Inbound
+      access:                Allow
+      protocol:              Tcp
+      destination_port:      443
+      source_address_prefix: VirtualNetwork
+    - name:                  DenyAllInbound
+      priority:              4096
+      direction:             Inbound
+      access:                Deny
+      protocol:              "*"
+      destination_port:      "*"
+      source_address_prefix: "*"
+
+  tags:
+    environment:  lab
+    workload:     hvlab-mms26
+    owner:        kristopherjturner
+    cost_center:  tplabs-demo
+    demo_event:   mms-moa-2026
+
+# =============================================================================
+# 5. HYPER-V HOST CONFIGURATION (applied via Custom Script Extension bootstrap)
+# =============================================================================
+hyperv_host:
+  windows_features:
+    - Hyper-V
+    - Hyper-V-PowerShell
+    - Failover-Clustering
+    - RSAT-Clustering
+    - RSAT-Clustering-PowerShell
+    - RSAT-AD-PowerShell
+    - FS-iSCSITarget-Server
+    - iSCSI-Software-Initiator
+
+  storage_pool_name:    HVLabStoragePool
+  storage_volume_label: HyperVStorage
+  storage_volume_letter: D
+
+  # WinNAT — provides outbound internet for nested VMs that don't have Azure IPs
+  nat_name:   HVLabNAT
+  nat_subnet: 172.16.0.0/12
+
+  # Hyper-V virtual switches inside the host VM
+  vswitches:
+    - name:   vSwitch-External
+      type:   External       # bound to Azure NIC — gives nested VMs Azure VNet reachability
+    - name:   vSwitch-Mgmt
+      type:   Internal
+      ip:     172.16.10.1
+      prefix: 172.16.10.0/24
+    - name:   vSwitch-Migration
+      type:   Internal
+      ip:     172.16.20.1
+      prefix: 172.16.20.0/24
+    - name:   vSwitch-Storage
+      type:   Internal
+      ip:     172.16.30.1
+      prefix: 172.16.30.0/24
+    - name:   vSwitch-Heartbeat
+      type:   Internal
+      ip:     172.16.40.1
+      prefix: 172.16.40.0/24
+    - name:   vSwitch-Workload
+      type:   Internal
+      ip:     172.16.50.1
+      prefix: 172.16.50.0/24
+
+  domain:
+    fqdn:    azrl.mgmt
+    netbios: AZRL
+    join_ou: "OU=hvlab-servers,OU=Servers,OU=MGMT,DC=azrl,DC=mgmt"
+
+# =============================================================================
+# 6. GITHUB ACTIONS SELF-HOSTED RUNNER
+#    Installed by CSE bootstrap script (section 1 / deployment.bootstrap_script)
+# =============================================================================
+github_runner:
+  org:          thisismydemo
+  repo:         mms_2026_hybrid_demo
+  label:        hvlab-host
+  install_dir:  C:\actions-runner
+  run_as:       NT AUTHORITY\SYSTEM
+  # Registration token must be pre-staged in Key Vault before deployment.
+  # Generate at: https://github.com/thisismydemo/mms_2026_hybrid_demo/settings/actions/runners
+  # Then: az keyvault secret set --vault-name kv-tplabs-platform --name hvlab-github-runner-token --value <token>
+  registration_token: keyvault://kv-tplabs-platform/hvlab-github-runner-token
+
+# =============================================================================
+# 7. NESTED VMs
+# =============================================================================
+nested_vms:
+  vhd_base_path:   D:\HyperVStorage\VMs
+  iso_path:        D:\HyperVStorage\ISOs
+  checkpoint_name: DEMO-READY     # applied to all VMs when environment is ready
+
+  # --- Domain Controller (replica DC for azrl.mgmt) ---
+  hvdc01:
+    name:        hvdc01
+    description: "AD DC replica for azrl.mgmt"
+    vcpus:       2
+    ram_gb:      8
+    os_disk_gb:  80
+    generation:  2
+    os:          WindowsServer2022
+    vswitches:
+      - vSwitch-External     # reachable on Azure subnet for replication
+      - vSwitch-Mgmt
+    ip_external:  10.250.1.45    # uses host's primary IP via External vSwitch (NAT not needed)
+    ip_mgmt:      172.16.10.10
+    role:         additional_dc
+    domain:       azrl.mgmt
+    replication_source: 10.250.1.36   # replicate from existing DC1
+
+  # --- iSCSI Target Server (FREE — Windows Server built-in role) ---
+  hviscsi01:
+    name:        hviscsi01
+    description: "iSCSI Target Server — Windows Server FS-iSCSITarget-Server role"
+    vcpus:       4
+    ram_gb:      16
+    os_disk_gb:  80
+    data_disks_gb:
+      - 2      # quorum.vhdx (Cloud Witness preferred — see cluster.witness)
+      - 500    # csv01.vhdx
+      - 500    # csv02.vhdx
+      - 500    # csv03-templates.vhdx
+    generation:  2
+    os:          WindowsServer2022
+    # Dual-homed on Storage vSwitch to provide MPIO paths
+    vswitches:
+      - vSwitch-Storage
+      - vSwitch-Storage
+    ip_storage1: 172.16.30.10
+    ip_storage2: 172.16.30.11
+    iscsi_iqn:   "iqn.2025-01.mgmt.azrl:hvlab-cluster-storage"
+    luns:
+      - id:   0
+        name: quorum.vhdx
+        size: 2GB
+        note: "Backup — Cloud Witness is preferred (see cluster.witness)"
+      - id:   1
+        name: csv01.vhdx
+        size: 500GB
+      - id:   2
+        name: csv02.vhdx
+        size: 500GB
+      - id:   3
+        name: csv03-templates.vhdx
+        size: 500GB
+
+  # --- Hyper-V Cluster Node 1 ---
+  hvnode01:
+    name:        hvnode01
+    description: "Hyper-V cluster node 1"
+    vcpus:       16
+    ram_gb:      64
+    os_disk_gb:  80
+    generation:  2
+    os:          WindowsServer2022
+    vswitches:
+      - vSwitch-Mgmt
+      - vSwitch-Migration
+      - vSwitch-Storage
+      - vSwitch-Heartbeat
+      - vSwitch-Workload
+    ip_mgmt:      172.16.10.21
+    ip_migration: 172.16.20.21
+    ip_storage:   172.16.30.21
+    ip_heartbeat: 172.16.40.21
+    cluster_name: hvlab-clus01
+
+  # --- Hyper-V Cluster Node 2 ---
+  hvnode02:
+    name:        hvnode02
+    description: "Hyper-V cluster node 2"
+    vcpus:       16
+    ram_gb:      64
+    os_disk_gb:  80
+    generation:  2
+    os:          WindowsServer2022
+    vswitches:
+      - vSwitch-Mgmt
+      - vSwitch-Migration
+      - vSwitch-Storage
+      - vSwitch-Heartbeat
+      - vSwitch-Workload
+    ip_mgmt:      172.16.10.22
+    ip_migration: 172.16.20.22
+    ip_storage:   172.16.30.22
+    ip_heartbeat: 172.16.40.22
+    cluster_name: hvlab-clus01
+
+  # --- Hyper-V Cluster Node 3 ---
+  hvnode03:
+    name:        hvnode03
+    description: "Hyper-V cluster node 3"
+    vcpus:       16
+    ram_gb:      64
+    os_disk_gb:  80
+    generation:  2
+    os:          WindowsServer2022
+    vswitches:
+      - vSwitch-Mgmt
+      - vSwitch-Migration
+      - vSwitch-Storage
+      - vSwitch-Heartbeat
+      - vSwitch-Workload
+    ip_mgmt:      172.16.10.23
+    ip_migration: 172.16.20.23
+    ip_storage:   172.16.30.23
+    ip_heartbeat: 172.16.40.23
+    cluster_name: hvlab-clus01
+
+  # --- Hyper-V Cluster Node 4 ---
+  hvnode04:
+    name:        hvnode04
+    description: "Hyper-V cluster node 4"
+    vcpus:       16
+    ram_gb:      64
+    os_disk_gb:  80
+    generation:  2
+    os:          WindowsServer2022
+    vswitches:
+      - vSwitch-Mgmt
+      - vSwitch-Migration
+      - vSwitch-Storage
+      - vSwitch-Heartbeat
+      - vSwitch-Workload
+    ip_mgmt:      172.16.10.24
+    ip_migration: 172.16.20.24
+    ip_storage:   172.16.30.24
+    ip_heartbeat: 172.16.40.24
+    cluster_name: hvlab-clus01
+
+  # --- WAC Virtualization Mode Server ---
+  # CRITICAL: WS2025 is MANDATORY — WAC vmode does NOT support WS2022 or earlier.
+  # Download installer: https://aka.ms/WACDownloadvMode (Windows Insider Preview)
+  # This is a SEPARATE product from WAC Administration Mode — do NOT mix them.
+  hvwac01:
+    name:        hvwac01
+    description: "Windows Admin Center — Virtualization Mode (preview, WS2025 only)"
+    vcpus:       4
+    ram_gb:      16
+    os_disk_gb:  80
+    generation:  2
+    os:          WindowsServer2025        # MANDATORY — no exceptions
+    vswitches:
+      - vSwitch-External   # Azure-routable via secondary IP 10.250.1.46
+      - vSwitch-Mgmt
+    external_ip: 10.250.1.46             # secondary IP on host NIC → Azure-routable
+    ip_mgmt:     172.16.10.30
+    wac_vmode:
+      download_url:      "https://aka.ms/WACDownloadvMode"
+      port:              443
+      prereq_vcredist:   "winget install Microsoft.VCRedist.2015+.x64 --Silent"
+      tls_cert:          self_signed      # 60-day expiry during preview
+      postgresql:
+        port:     5432
+        username: wacadmin
+        password: keyvault://kv-tplabs-platform/hvwac01-pg-password
+    managed_hosts:
+      - hvnode01
+      - hvnode02
+      - hvnode03
+      - hvnode04
+      - hviscsi01
+      - hvdc01
+
+  # --- SCVMM 2025 + SQL Server Developer Edition ---
+  hvscvmm01:
+    name:        hvscvmm01
+    description: "System Center VMM 2025 + SQL Server Developer Edition (free dev/test)"
+    vcpus:       8
+    ram_gb:      32
+    os_disk_gb:  80
+    data_disk_gb: 100
+    generation:  2
+    os:          WindowsServer2022
+    vswitches:
+      - vSwitch-External   # Azure-routable via secondary IP 10.250.1.47
+      - vSwitch-Mgmt
+    external_ip: 10.250.1.47             # secondary IP on host NIC → Azure-routable
+    ip_mgmt:     172.16.10.40
+    scvmm:
+      version:         "2025"
+      sql_edition:     Developer          # free for dev/test
+      db_name:         VirtualManagerDB
+      library_share:   "\\hvscvmm01\\SCVMMLibrary"
+      service_account: svc-scvmm-svc
+
+# =============================================================================
+# 8. FAILOVER CLUSTER
+# =============================================================================
+cluster:
+  name: hvlab-clus01
+  ip:   172.16.10.200
+  nodes:
+    - hvnode01
+    - hvnode02
+    - hvnode03
+    - hvnode04
+
+  # Cloud Witness — Azure Blob Storage (recommended over quorum disk)
+  # Free, no extra VM, eliminates single point of failure
+  witness:
+    type:             cloud
+    # CAF storage account naming: st<workload><seq> — no hyphens, max 24 chars, lowercase
+    storage_account:  sthvlabwitness01
+    container:        cluster-witness
+    resource_group:   rg-hvlab-mms26-eus-01
+
+  csvs:
+    - name: CSV01
+      lun:  1
+      path: C:\ClusterStorage\Volume1
+    - name: CSV02
+      lun:  2
+      path: C:\ClusterStorage\Volume2
+    - name: CSV03-Templates
+      lun:  3
+      path: C:\ClusterStorage\Volume3
+
+  cno_prestage_ou: "OU=hvlab-clus01,OU=Clusters,OU=Servers,OU=MGMT,DC=azrl,DC=mgmt"
+
+# =============================================================================
+# 9. ACTIVE DIRECTORY
+# =============================================================================
+active_directory:
+  domain:  azrl.mgmt
+  netbios: AZRL
+
+  existing_dcs:
+    - 10.250.1.36   # DC1 — existing in tplabs
+    - 10.250.1.37   # DC2 — existing in tplabs
+
+  ous:
+    clusters:       "OU=Clusters,OU=Servers,OU=MGMT,DC=azrl,DC=mgmt"
+    hvlab_cluster:  "OU=hvlab-clus01,OU=Clusters,OU=Servers,OU=MGMT,DC=azrl,DC=mgmt"
+    servers:        "OU=hvlab-servers,OU=Servers,OU=MGMT,DC=azrl,DC=mgmt"
+    svc_accounts:   "OU=ServiceAccounts,OU=MGMT,DC=azrl,DC=mgmt"
+    sec_groups:     "OU=Security Groups,OU=MGMT,DC=azrl,DC=mgmt"
+
+  service_accounts:
+    svc_hvlab_deploy:
+      sam:         svc-hvlab-deploy
+      description: "HV-Lab bootstrap and deployment — temp admin during build"
+      password:    keyvault://kv-tplabs-platform/svc-hvlab-deploy-password
+    svc_scvmm_svc:
+      sam:         svc-scvmm-svc
+      description: "SCVMM management server service account"
+      password:    keyvault://kv-tplabs-platform/svc-scvmm-svc-password
+    svc_scvmm_agent:
+      sam:         svc-scvmm-agent
+      description: "SCVMM agent account — local admin on Hyper-V hosts"
+      password:    keyvault://kv-tplabs-platform/svc-scvmm-agent-password
+    svc_scvmm_runas:
+      sam:         svc-scvmm-runas
+      description: "SCVMM Run As account for cluster node management"
+      password:    keyvault://kv-tplabs-platform/svc-scvmm-runas-password
+    svc_sql_scvmm:
+      sam:         svc-sql-scvmm
+      description: "SQL Server service account for SCVMM database"
+      password:    keyvault://kv-tplabs-platform/svc-sql-scvmm-password
+    svc_wac_gateway:
+      sam:         svc-wac-gateway
+      description: "WAC vmode service account"
+      password:    keyvault://kv-tplabs-platform/svc-wac-gateway-password
+
+  security_groups:
+    - name:        SG-TP-hvlab-clus01-HyperV-Administrators
+      description: "Full Hyper-V cluster admin"
+    - name:        SG-TP-hvlab-clus01-WAC-Administrators
+      description: "WAC vmode full admin"
+    - name:        SG-TP-hvlab-clus01-WAC-Users
+      description: "WAC vmode standard users (demo audience)"
+    - name:        SG-TP-hvlab-clus01-SCVMM-Administrators
+      description: "SCVMM administrator role"
+    - name:        SG-TP-hvlab-clus01-SCVMM-Users
+      description: "SCVMM self-service users (demo audience)"
+
+# =============================================================================
+# 10. KEY VAULT
+# =============================================================================
+key_vault:
+  name:           kv-tplabs-platform     # existing tplabs Key Vault — reuse
+  resource_group: rg-c01-platform-eus-01  # existing
+  # Pre-stage ALL of these secrets before running any deployment workflow:
+  secrets_required:
+    - hvlab-host01-admin-password
+    - hvlab-github-runner-token
+    - hvwac01-pg-password
+    - svc-hvlab-deploy-password
+    - svc-scvmm-svc-password
+    - svc-scvmm-agent-password
+    - svc-scvmm-runas-password
+    - svc-sql-scvmm-password
+    - svc-wac-gateway-password
+
+# =============================================================================
+# 11. MANAGED IDENTITY (user-assigned — for Key Vault secret access)
+# =============================================================================
+identity:
+  host_vm_identity:
+    name: mi-hvlab-host01-eus-01
+    rg:   rg-hvlab-mms26-eus-01
+    roles:
+      - role:  Key Vault Secrets User
+        scope: "/subscriptions/00cd4357-ed45-4efb-bee0-10c467ff994b/resourceGroups/rg-c01-platform-eus-01/providers/Microsoft.KeyVault/vaults/kv-tplabs-platform"
+      - role:  Reader
+        scope: "/subscriptions/00cd4357-ed45-4efb-bee0-10c467ff994b"
+
+# =============================================================================
+# 12. TAGS (applied to all Azure resources in this deployment)
+# =============================================================================
+tags:
+  environment:  lab
+  workload:     hvlab-mms26
+  owner:        kristopherjturner
+  cost_center:  tplabs-demo
+  demo_event:   mms-moa-2026
+  created_by:   bicep
+  repo:         thisismydemo/mms_2026_hybrid_demo
+
+# =============================================================================
+# 13. GITHUB ACTIONS WORKFLOWS
+#     All workflows live at repo root: .github/workflows/hvlab-*.yml
+# =============================================================================
+github_workflows:
+  hvlab_01_deploy_azure:
+    file:        .github/workflows/hvlab-01-deploy-azure.yml
+    runs_on:     ubuntu-latest    # GitHub-hosted
+    description: "Deploy Azure resources via Bicep (RG, VM, NIC, NSG, PIP, disks, storage)"
+  hvlab_02_bootstrap_host:
+    file:        .github/workflows/hvlab-02-bootstrap-host.yml
+    runs_on:     ubuntu-latest    # GitHub-hosted — runs CSE via az vm extension set
+    description: "Bootstrap host VM: Hyper-V, vSwitches, WinNAT, domain join, GitHub runner install"
+  hvlab_03_deploy_nested_vms:
+    file:        .github/workflows/hvlab-03-deploy-nested-vms.yml
+    runs_on:     "[self-hosted, hvlab-host]"
+    description: "Create nested VMs: DC, iSCSI, 4 cluster nodes, WAC vmode, SCVMM"
+  hvlab_04_configure_cluster:
+    file:        .github/workflows/hvlab-04-configure-cluster.yml
+    runs_on:     "[self-hosted, hvlab-host]"
+    description: "Configure iSCSI initiators, Failover Cluster, CSVs, Cloud Witness"
+  hvlab_05_configure_wac_vmode:
+    file:        .github/workflows/hvlab-05-configure-wac-vmode.yml
+    runs_on:     "[self-hosted, hvlab-host]"
+    description: "Install WAC Virtualization Mode on hvwac01 (WS2025), add cluster hosts"
+  hvlab_06_configure_scvmm:
+    file:        .github/workflows/hvlab-06-configure-scvmm.yml
+    runs_on:     "[self-hosted, hvlab-host]"
+    description: "Install SQL Dev + SCVMM 2025, add hosts, configure library, logical networks"
+  hvlab_07_demo_reset:
+    file:        .github/workflows/hvlab-07-demo-reset.yml
+    runs_on:     "[self-hosted, hvlab-host]"
+    description: "Restore all nested VMs to DEMO-READY checkpoint (run on demo day)"
+  hvlab_08_validate:
+    file:        .github/workflows/hvlab-08-validate.yml
+    runs_on:     "[self-hosted, hvlab-host]"
+    description: "Validate environment: cluster health, connectivity, WAC/SCVMM reachability"
+
+# =============================================================================
+# 14. DEMO SESSIONS
+# =============================================================================
+demo:
+  event: "MMS MOA 2026"
+  sessions:
+    session1:
+      title:       "Nested Hyper-V Cluster with WAC Virtualization Mode"
+      description: "Build and manage a 4-node Hyper-V failover cluster using WAC vmode preview"
+    session2:
+      title:       "SCVMM 2025 — Managing Hyper-V from the VMM console"
+      description: "Full SCVMM lifecycle — deploy VMs, manage clusters, connect to Azure"
+  checkpoints:
+    demo_ready: DEMO-READY
+    pre_demo1:  PRE-DEMO-1
+    pre_demo2:  PRE-DEMO-2
+  reset_script: hyperv-cluster-demo/scripts/demo/07-demo-reset.ps1
