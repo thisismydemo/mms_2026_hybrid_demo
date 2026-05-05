@@ -5,25 +5,43 @@
 ##############################################################################
 
 param(
-    [string]$ScvmmServer  = 'hvscvmm01',
-    [string]$SqlISO       = 'D:\HyperVStorage\ISOs\SQL2022Dev.iso',
-    [string]$ScvmmISO     = 'D:\HyperVStorage\ISOs\SCVMM2025.iso',
-    [string]$DomainFqdn   = 'azrl.mgmt',
-    [string]$KVName       = 'kv-tplabs-platform',
-    [string]$KVSubscription = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
+    [string]$ScvmmServer       = 'hvscvmm01',
+    [string]$SqlISO            = 'D:\HyperVStorage\ISOs\SQL2022Dev.iso',
+    [string]$ScvmmSetupDest    = 'D:\HyperVStorage\SCVMM2025',   # downloaded from blob
+    [string]$ScvmmStorageAcct  = 'sthvlabcontent01',
+    [string]$DomainFqdn        = 'azrl.mgmt',
+    [string]$KVName            = 'kv-tplabs-platform',
+    [string]$KVSubscription    = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
 )
 
 $ErrorActionPreference = 'Stop'
 Write-Host "=== Installing SQL Server Developer + SCVMM 2025 on $ScvmmServer ===" -ForegroundColor Cyan
 
-# Get service account passwords from Key Vault
-$sqlSvcPw = az keyvault secret show --vault-name $KVName --subscription $KVSubscription `
-    --name 'svc-sql-scvmm-password' --query value -o tsv
-$scvmmSvcPw = az keyvault secret show --vault-name $KVName --subscription $KVSubscription `
-    --name 'svc-scvmm-svc-password' --query value -o tsv
+# Download SCVMM files from blob storage to host, then copy to nested VM
+Write-Host "Downloading SCVMM 2025 installer from blob storage..."
+New-Item -ItemType Directory -Path $ScvmmSetupDest -Force | Out-Null
+$storageKey = az storage account keys list --account-name $ScvmmStorageAcct `
+    --resource-group "rg-hvlab-mms26-eus-01" --query "[0].value" -o tsv
+az storage blob download-batch `
+    --account-name $ScvmmStorageAcct `
+    --source "scvmm" `
+    --destination $ScvmmSetupDest `
+    --account-key $storageKey | Out-Null
+Write-Host "SCVMM installer downloaded to $ScvmmSetupDest"
 
-Invoke-Command -ComputerName $ScvmmServer -ArgumentList $SqlISO, $ScvmmISO, $DomainFqdn, $sqlSvcPw, $scvmmSvcPw -ScriptBlock {
-    param($SqlISO, $ScvmmISO, $DomainFqdn, $SqlSvcPw, $ScvmmSvcPw)
+# Copy SCVMM setup to nested VM
+$session = New-PSSession -ComputerName $ScvmmServer
+Copy-Item -Path $ScvmmSetupDest -Destination "D:\SCVMM2025" -ToSession $session -Recurse -Force
+
+# Get service account passwords from Key Vault
+$sqlSvcPw   = az keyvault secret show --vault-name $KVName --subscription $KVSubscription `
+    --name 'hvlab-sqlsa-password' --query value -o tsv
+$scvmmSvcPw = az keyvault secret show --vault-name $KVName --subscription $KVSubscription `
+    --name 'hvlab-svcaccount-password' --query value -o tsv
+
+Invoke-Command -Session $session -ArgumentList $SqlISO, $DomainFqdn, $sqlSvcPw, $scvmmSvcPw -ScriptBlock {
+    param($SqlISO, $DomainFqdn, $SqlSvcPw, $ScvmmSvcPw)
+    $ScvmmSetup = 'D:\SCVMM2025\setup.exe'
 
     # ── SQL Server Developer Edition ─────────────────────────────────────────
     Write-Host "Mounting SQL Server ISO..."

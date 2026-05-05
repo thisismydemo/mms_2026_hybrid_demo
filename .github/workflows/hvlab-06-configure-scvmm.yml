@@ -2,9 +2,13 @@ name: "HVLab 06 — Configure SCVMM 2025"
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["HVLab 05 — Configure WAC Virtualization Mode"]
+    types: [completed]
 
 jobs:
   configure-scvmm:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: Install SQL + SCVMM 2025 on hvscvmm01
     runs-on: [self-hosted, hvlab-host]
     steps:

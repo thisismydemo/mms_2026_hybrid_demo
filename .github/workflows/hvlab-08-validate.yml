@@ -2,9 +2,13 @@ name: "HVLab 08 — Validate Environment"
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["HVLab 06 — Configure SCVMM 2025"]
+    types: [completed]
 
 jobs:
   validate:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: Validate full environment
     runs-on: [self-hosted, hvlab-host]
     steps:

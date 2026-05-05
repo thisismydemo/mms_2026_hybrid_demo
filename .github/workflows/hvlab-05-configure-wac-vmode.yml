@@ -2,9 +2,13 @@ name: "HVLab 05 — Configure WAC Virtualization Mode"
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["HVLab 04 — Configure Failover Cluster"]
+    types: [completed]
 
 jobs:
   configure-wac-vmode:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: Install and configure WAC vmode on hvwac01
     runs-on: [self-hosted, hvlab-host]
     steps:

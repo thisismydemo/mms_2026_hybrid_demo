@@ -2,9 +2,13 @@ name: "HVLab 04 — Configure Failover Cluster"
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["HVLab 03 — Deploy Nested VMs"]
+    types: [completed]
 
 jobs:
   configure-cluster:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: Configure iSCSI + Failover Cluster
     runs-on: [self-hosted, hvlab-host]
     steps:

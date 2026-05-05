@@ -2,9 +2,13 @@ name: "HVLab 03 — Deploy Nested VMs"
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["HVLab 02 — Bootstrap Host VM"]
+    types: [completed]
 
 jobs:
   deploy-nested-vms:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     name: Create all nested VMs
     runs-on: [self-hosted, hvlab-host]
     steps:

@@ -84,15 +84,17 @@ jobs:
       - name: "Wait for domain join reboot"
         run: sleep 120
 
-      # ── Get GitHub runner token ─────────────────────────────────────────────
-      - name: "Get GitHub runner token from Key Vault"
+      # ── Get GitHub runner token via GitHub API (no manual KV step needed) ────
+      - name: "Generate GitHub runner registration token"
         id: runner-token
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TOKEN=$(az keyvault secret show \
-            --vault-name "$KV_NAME" \
-            --subscription "$KV_SUBSCRIPTION" \
-            --name "hvlab-github-runner-token" \
-            --query value -o tsv)
+          TOKEN=$(curl -s -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/thisismydemo/mms_2026_hybrid_demo/actions/runners/registration-token \
+            | jq -r .token)
           echo "::add-mask::$TOKEN"
           echo "runner_token=$TOKEN" >> $GITHUB_OUTPUT
 
