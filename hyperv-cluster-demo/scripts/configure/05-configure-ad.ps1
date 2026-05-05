@@ -131,4 +131,29 @@ foreach ($sourceNode in $clusterNodes) {
     Write-Host "  ✅ KCD configured for $sourceNode → $($clusterNodes | Where-Object{$_ -ne $sourceNode} | Join-String ', ')"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DNS Forwarder on hvdc01
+# Forwarder target: 168.63.129.16 (Azure recursive DNS)
+# This lets nested VMs resolve public internet names via WinNAT on the host.
+# The domain azrl.mgmt is already authoritative — forwarder is only for external.
+# ─────────────────────────────────────────────────────────────────────────────
+Write-Host "`nConfiguring DNS Forwarder on $DomainController..."
+
+Invoke-Command -ComputerName $DomainController -ScriptBlock {
+    # Remove any existing forwarders first (clean state)
+    Get-DnsServerForwarder | Remove-DnsServerForwarder -Force -ErrorAction SilentlyContinue
+
+    # Add Azure recursive DNS (168.63.129.16) as primary forwarder
+    # Add 1.1.1.1 (Cloudflare) as secondary fallback
+    Add-DnsServerForwarder -IPAddress '168.63.129.16','1.1.1.1' -PassThru
+
+    Write-Host "  ✅ DNS forwarders set: 168.63.129.16 (Azure DNS), 1.1.1.1 (fallback)"
+
+    # Disable root hints — we want forwarders only (not iterative resolution)
+    # This is safer in a NAT'd lab where the DC can't reach root servers directly
+    Set-DnsServerForwarder -UseRootHint $false
+
+    Write-Host "  ✅ Root hints disabled (forwarder-only mode)"
+}
+
 Write-Host "`n✅ Active Directory configuration complete."

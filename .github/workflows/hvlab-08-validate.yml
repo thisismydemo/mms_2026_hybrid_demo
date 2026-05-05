@@ -81,15 +81,7 @@ jobs:
       - name: "Take DEMO-READY checkpoint (if all checks pass)"
         shell: pwsh
         run: |
-          $vms = Get-VM | Where-Object { $_.Name -like 'hv*' -and $_.State -eq 'Running' }
-          foreach ($vm in $vms) {
-            # Remove old DEMO-READY checkpoint if it exists
-            Get-VMSnapshot -VM $vm -Name 'DEMO-READY' -ErrorAction SilentlyContinue |
-              Remove-VMSnapshot -Confirm:$false -ErrorAction SilentlyContinue
-            # Take fresh checkpoint
-            Checkpoint-VM -VM $vm -SnapshotName 'DEMO-READY'
-            Write-Host "  ✅ Checkpoint 'DEMO-READY' taken for $($vm.Name)"
-          }
+          hyperv-cluster-demo/scripts/demo/01-take-checkpoint.ps1 -CheckpointName 'DEMO-READY'
 
       - name: Summary
         shell: pwsh

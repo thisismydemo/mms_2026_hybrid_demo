@@ -109,6 +109,25 @@ jobs:
             --output json
           echo "GitHub runner installed."
 
+      # ── ISO Downloads (runs on self-hosted runner after it's registered) ──────
+      # NOTE: This step runs on the self-hosted runner so files land on D:\
+      - name: "Download evaluation ISOs (WS2022, WS2025, SQL 2022 Dev)"
+        runs-on: [self-hosted, hvlab-host]
+        run: |
+          cd hyperv-cluster-demo
+          powershell -ExecutionPolicy Bypass -File scripts/deploy/00-download-isos.ps1
+        continue-on-error: true   # don't fail the whole workflow if a download is slow/retried
+
+      # ── Azure Arc on host VM ────────────────────────────────────────────────
+      - name: "Install Azure Arc Connected Machine Agent on host"
+        runs-on: [self-hosted, hvlab-host]
+        run: |
+          powershell -ExecutionPolicy Bypass -File `
+            hyperv-cluster-demo/scripts/deploy/07-install-arc.ps1 `
+            -SubscriptionId "${{ env.SUBSCRIPTION_ID }}" `
+            -ResourceGroup  "${{ env.RESOURCE_GROUP }}"
+        continue-on-error: true   # Arc install failure shouldn't block lab setup
+
       - name: Summary
         run: |
           echo "## ✅ Host VM Bootstrap Complete" >> $GITHUB_STEP_SUMMARY
@@ -119,5 +138,7 @@ jobs:
           echo "- WinNAT configured (172.16.0.0/12)" >> $GITHUB_STEP_SUMMARY
           echo "- Host joined to azrl.mgmt" >> $GITHUB_STEP_SUMMARY
           echo "- Self-hosted runner **hvlab-host** installed and running" >> $GITHUB_STEP_SUMMARY
+          echo "- Evaluation ISOs downloading to D:\\HyperVStorage\\ISOs\\" >> $GITHUB_STEP_SUMMARY
+          echo "- Azure Arc agent installed on host VM" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Next step:** Run **HVLab 03 — Deploy Nested VMs**" >> $GITHUB_STEP_SUMMARY
