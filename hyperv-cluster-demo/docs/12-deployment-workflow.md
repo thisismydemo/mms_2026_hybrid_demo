@@ -49,7 +49,7 @@ az network vnet subnet show `
 
 ### What It Does
 
-1. Logs in to Azure using `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_CLIENT_SECRET`
+1. Logs in to Azure via OIDC using `mi-hvlab-deploy-eus-01` managed identity (no client secret)
 2. Runs `az deployment group create` with `bicep/main.bicep`
 3. Creates:
    - NIC `nic-hv-host01` with 3 IP configurations (`.45`, `.46`, `.47`)
@@ -91,7 +91,7 @@ Test-Connection -ComputerName "10.250.1.45" -Count 4
 |---------|-------|-----|
 | `QuotaExceeded` | E104ids_v5 capacity unavailable | Request quota increase or use fallback SKU from `docs/03-host-vm-sizing.md` |
 | `IPAddressAlreadyInUse` | `.45`/`.46`/`.47` allocated | Check existing NICs and release the IP |
-| `AuthorizationFailed` | Service principal missing Contributor role | `az role assignment create --role Contributor ...` |
+| `AuthorizationFailed` | Managed identity missing Contributor role | Re-run `00-setup-identity.ps1` |
 
 ---
 

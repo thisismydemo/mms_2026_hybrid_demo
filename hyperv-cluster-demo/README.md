@@ -38,9 +38,8 @@ Azure Subscription 00cd4357-ed45-4efb-bee0-10c467ff994b
 
 Before running any workflow, complete **all** steps in [`docs/02-prerequisites.md`](docs/02-prerequisites.md):
 
-- [ ] Azure RBAC: Contributor on `rg-hvlab-mms26-eus-01`, Key Vault access
+- [ ] Run `00-setup-identity.ps1` once to create `mi-hvlab-deploy-eus-01` and set GitHub secrets (no app registration needed)
 - [ ] Key Vault secrets pre-staged (9 secrets — see prerequisites doc)
-- [ ] GitHub repo secrets set: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_CLIENT_SECRET`
 - [ ] GitHub runner token ready (for workflow 02)
 - [ ] WS2022 and WS2025 evaluation ISO files uploaded to blob storage
 - [ ] Domain admin credentials available for `azrl.mgmt`

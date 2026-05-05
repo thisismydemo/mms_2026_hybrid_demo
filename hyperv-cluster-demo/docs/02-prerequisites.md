@@ -154,28 +154,33 @@ The runner will register with label `hvlab-host`. All workflows from step 03 onw
 
 ## 5. GitHub Repository Secrets
 
-These four secrets must be set in the GitHub repository before any workflow can authenticate to Azure.
+These **three** secrets must be set in the GitHub repository before any workflow can authenticate to Azure. Run `scripts/deploy/00-setup-identity.ps1` — it creates everything and optionally sets them for you via `gh` CLI.
 
 Navigate to: **Repository → Settings → Secrets and variables → Actions → New repository secret**
 
 | Secret Name | Value |
 |-------------|-------|
-| `AZURE_CLIENT_ID` | Service principal Application (client) ID |
-| `AZURE_TENANT_ID` | Azure AD tenant ID |
+| `AZURE_CLIENT_ID` | Client ID of `mi-hvlab-deploy-eus-01` (managed identity) |
+| `AZURE_TENANT_ID` | `a9b67171-3fbb-45bf-8394-eb56d02a86e4` |
 | `AZURE_SUBSCRIPTION_ID` | `00cd4357-ed45-4efb-bee0-10c467ff994b` |
-| `AZURE_CLIENT_SECRET` | Service principal client secret |
 
-### Create the Service Principal (if needed)
+> **No `AZURE_CLIENT_SECRET`.** GitHub Actions authenticates via OIDC federated credentials bound to the `mi-hvlab-deploy-eus-01` user-assigned managed identity. No app registration. No client secret. No secret rotation.
 
-```powershell
-az ad sp create-for-rbac `
-  --name "sp-hvlab-mms26-github" `
-  --role "Contributor" `
-  --scopes "/subscriptions/00cd4357-ed45-4efb-bee0-10c467ff994b/resourceGroups/rg-hvlab-mms26-eus-01" `
-  --sdk-auth
+### How It Works
+
+```
+GitHub Actions runner → sends short-lived OIDC token to Azure AD
+Azure AD → validates token issuer + subject claim (repo:thisismydemo/mms_2026_hybrid_demo:ref:refs/heads/main)
+Azure AD → exchanges for access token scoped to mi-hvlab-deploy-eus-01
+Workflow → uses that token for all az CLI calls
 ```
 
-The output JSON contains all four values. Store them in the GitHub secrets listed above.
+### Bootstrap (one-time)
+
+```powershell
+# Run once. Requires 'az login' with an account that has Owner on 00cd4357 sub.
+.\hyperv-cluster-demo\scripts\deploy\00-setup-identity.ps1
+```
 
 ---
 

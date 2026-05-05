@@ -26,7 +26,7 @@ metadata:
   subscription_id: "00cd4357-ed45-4efb-bee0-10c467ff994b"
   owner: kristopherjturner
   purpose: "MMS MOA 2026 Nested Hyper-V 4-node cluster demo environment"
-  last_updated: "2025-01"
+  last_updated: "2026-05"
 
 # =============================================================================
 # 1. DEPLOYMENT APPROACH
@@ -50,10 +50,11 @@ deployment:
   automation: github_actions
   github_runner_label: hvlab-host
 
-  # DSC / Arc: NOT used for this deployment
-  # - DSC v3: skipped (straight PowerShell is simpler for a demo environment)
-  # - Azure Arc on host: skipped (Arc is overkill for a single-VM demo host)
-  # - Arc can be added post-demo if desired for Arc-enabled Server demo stories
+  # DSC: NOT used (straight PowerShell is simpler for a demo environment)
+  # Azure Arc: installed on hvlabhost01 (host VM only) — see 07-install-arc.ps1
+  #   - Runs in post-bootstrap job of hvlab-02 workflow
+  #   - Arc resource: arcm-hvlabhost01 in rg-hvlab-mms26-eus-01
+  #   - Enables Azure Policy, monitoring, and Arc demo stories on the host
 
   azure_context:
     tenant_id: a9b67171-3fbb-45bf-8394-eb56d02a86e4

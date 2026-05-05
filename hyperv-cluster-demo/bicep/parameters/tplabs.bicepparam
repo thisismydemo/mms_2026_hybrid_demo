@@ -36,8 +36,9 @@ param adminUsername = 'hvlabadmin'
 
 // Admin password sourced from Key Vault — never stored in plaintext
 // Pre-stage: az keyvault secret set --vault-name kv-tplabs-platform --name hvlab-host01-admin-password --value '<password>'
+// NOTE: getSecret() subscription must match where the KV actually lives (tplabs hub sub, NOT the deployment sub)
 param adminPassword = getSecret(
-  '00cd4357-ed45-4efb-bee0-10c467ff994b',
+  '2caa0b8a-a1d6-4f0c-8c03-861787b8315c',   // tplabs subscription — where kv-tplabs-platform lives
   'rg-c01-platform-eus-01',
   'kv-tplabs-platform',
   'hvlab-host01-admin-password'
