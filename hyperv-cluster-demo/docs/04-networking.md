@@ -11,7 +11,7 @@ The networking design uses **one Azure NIC** with multiple IP configurations to 
 **No new VNet or subnet is created.** The host VM is placed directly in:
 
 - **VNet**: `vnet-lab-prodtech-eus-connectivity-hub` (`10.250.0.0/16`)
-- **Subnet**: `snet-lab-prodtech-eus-connectivity-mgmt` (`10.250.1.0/24`)
+- **Subnet**: `snet-lab-prodtech-eus-connectivity-mgmt` (`10.250.2.0/24`)
 
 The reason is BGP. The FortiGate-90G (ASN 65421) at the on-premises site peers with the Azure VPN Gateway (ASN 65422) and advertises `10.250.0.0/16` bidirectionally. Any IP address in that range is automatically reachable from:
 
@@ -19,7 +19,7 @@ The reason is BGP. The FortiGate-90G (ASN 65421) at the on-premises site peers w
 - Corporate network clients
 - Other on-premises servers
 
-This means that by assigning `10.250.1.46` and `10.250.1.47` as secondary IPs on the host's Azure NIC and enabling IP forwarding, the nested VMs `hvwac01` and `hvscvmm01` become directly reachable from on-premises **with no additional routing configuration**. See [`docs/11-bgp-routing-connectivity.md`](11-bgp-routing-connectivity.md) for the full BGP topology.
+This means that by assigning `10.250.2.6` and `10.250.2.7` as secondary IPs on the host's Azure NIC and enabling IP forwarding, the nested VMs `hvwac01` and `hvscvmm01` become directly reachable from on-premises **with no additional routing configuration**. See [`docs/11-bgp-routing-connectivity.md`](11-bgp-routing-connectivity.md) for the full BGP topology.
 
 ---
 
@@ -29,9 +29,9 @@ The host VM's NIC (`nic-hv-host01`) has three IP configurations:
 
 | IP Config Name | IP Address | Purpose |
 |----------------|-----------|---------|
-| `ipconfig-primary` | `10.250.1.45` (static) | Host VM management, RDP, deployment |
-| `ipconfig-wac` | `10.250.1.46` (static) | Secondary IP → forwarded to `hvwac01` |
-| `ipconfig-scvmm` | `10.250.1.47` (static) | Secondary IP → forwarded to `hvscvmm01` |
+| `ipconfig-primary` | `10.250.2.5` (static) | Host VM management, RDP, deployment |
+| `ipconfig-wac` | `10.250.2.6` (static) | Secondary IP → forwarded to `hvwac01` |
+| `ipconfig-scvmm` | `10.250.2.7` (static) | Secondary IP → forwarded to `hvscvmm01` |
 
 **IP forwarding** must be enabled on the NIC at the Azure platform level:
 
@@ -52,7 +52,7 @@ az network nic update `
 Type:    External (bound to Azure NIC)
 Purpose: Connects nested VMs to the Azure network
          hvwac01 and hvscvmm01 each have a vNIC on this switch
-         with static IPs 10.250.1.46 and 10.250.1.47 respectively
+         with static IPs 10.250.2.6 and 10.250.2.7 respectively
 Notes:   The host OS also uses the Azure NIC — Hyper-V shares the
          physical NIC between the host management OS and the external switch
 ```
@@ -66,7 +66,7 @@ Gateway: 172.16.10.1 (host OS virtual NIC)
 Purpose: Management traffic — RDP, PS Remoting, domain join,
          WMI, Hyper-V remote management
 VMs:     All nested VMs have a NIC on this switch
-DNS:     172.16.10.10 (hvdc01) primary, 10.250.1.36 secondary
+DNS:     172.16.10.10 (hvdc01) primary, 172.16.10.10 secondary
 ```
 
 ### vSwitch-Migration
@@ -167,9 +167,9 @@ New-NetIPAddress `
 
 ---
 
-## Secondary IP Forwarding (10.250.1.46 → hvwac01 / 10.250.1.47 → hvscvmm01)
+## Secondary IP Forwarding (10.250.2.6 → hvwac01 / 10.250.2.7 → hvscvmm01)
 
-When traffic destined for `10.250.1.46` arrives at the host VM's NIC, the Azure platform delivers it to the host OS because `.46` is a registered secondary IP on the NIC. The host OS then needs to forward it to the appropriate nested VM.
+When traffic destined for `10.250.2.6` arrives at the host VM's NIC, the Azure platform delivers it to the host OS because `.46` is a registered secondary IP on the NIC. The host OS then needs to forward it to the appropriate nested VM.
 
 ### Configuration Steps
 
@@ -183,10 +183,10 @@ Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters
   -Name "IPEnableRouter" -Value 1
 
 # Add static routes from secondary IPs to nested VM Mgmt IPs
-# 10.250.1.46 → hvwac01 at 172.16.10.30
+# 10.250.2.6 → hvwac01 at 172.16.10.30
 route add 172.16.10.30 mask 255.255.255.255 172.16.10.1 -p
 
-# 10.250.1.47 → hvscvmm01 at 172.16.10.40
+# 10.250.2.7 → hvscvmm01 at 172.16.10.40
 route add 172.16.10.40 mask 255.255.255.255 172.16.10.1 -p
 ```
 
@@ -195,16 +195,16 @@ route add 172.16.10.40 mask 255.255.255.255 172.16.10.1 -p
 ```powershell
 # On hvwac01 — bind the Azure secondary IP to the External vSwitch NIC
 New-NetIPAddress `
-  -IPAddress "10.250.1.46" `
+  -IPAddress "10.250.2.6" `
   -PrefixLength 24 `
-  -DefaultGateway "10.250.1.1" `
+  -DefaultGateway "10.250.2.1" `
   -InterfaceAlias "Ethernet (vSwitch-External)"
 
 # On hvscvmm01 — bind the Azure secondary IP to the External vSwitch NIC
 New-NetIPAddress `
-  -IPAddress "10.250.1.47" `
+  -IPAddress "10.250.2.7" `
   -PrefixLength 24 `
-  -DefaultGateway "10.250.1.1" `
+  -DefaultGateway "10.250.2.1" `
   -InterfaceAlias "Ethernet (vSwitch-External)"
 ```
 
@@ -217,9 +217,9 @@ All nested VMs use the following DNS configuration:
 | DNS Order | Server | Purpose |
 |-----------|--------|---------|
 | Primary | `172.16.10.10` | `hvdc01` — replica DC inside nested environment |
-| Secondary | `10.250.1.36` | Existing production DC (fallback — reachable via BGP/NIC) |
+| Secondary | `172.16.10.10` | Existing production DC (fallback — reachable via BGP/NIC) |
 
-During initial setup (before `hvdc01` is promoted), use `10.250.1.36` and `10.250.1.37` temporarily.
+During initial setup (before `hvdc01` is promoted), use `172.16.10.10` and `172.16.10.11` temporarily.
 
 ---
 
@@ -266,9 +266,9 @@ The subnet NSG (`nsg-snet-lab-prodtech-eus-connectivity-mgmt`) should be reviewe
 
 | Rule | Protocol | Port | Source | Destination | Purpose |
 |------|----------|------|--------|-------------|---------|
-| Allow-RDP | TCP | 3389 | Corp IP range | `10.250.1.45` | Admin access to host |
-| Allow-WinRM | TCP | 5985, 5986 | `10.250.0.0/16` | `10.250.1.45-.47` | PowerShell remoting |
-| Allow-HTTPS | TCP | 443 | `10.250.0.0/16` | `10.250.1.46` | WAC vMode web UI |
-| Allow-HTTPS-SCVMM | TCP | 443, 8100 | `10.250.0.0/16` | `10.250.1.47` | SCVMM console |
+| Allow-RDP | TCP | 3389 | Corp IP range | `10.250.2.5` | Admin access to host |
+| Allow-WinRM | TCP | 5985, 5986 | `10.250.0.0/16` | `10.250.2.5-.47` | PowerShell remoting |
+| Allow-HTTPS | TCP | 443 | `10.250.0.0/16` | `10.250.2.6` | WAC vMode web UI |
+| Allow-HTTPS-SCVMM | TCP | 443, 8100 | `10.250.0.0/16` | `10.250.2.7` | SCVMM console |
 
 > Verify with your network team that the FortiGate policy permits these flows from on-premises source IPs.

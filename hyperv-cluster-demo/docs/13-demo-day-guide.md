@@ -6,7 +6,7 @@ Complete this checklist at least **30 minutes before** the session begins:
 
 ### Environment Health
 
-- [ ] RDP to `hv-host01` (10.250.1.45) successfully
+- [ ] RDP to `hv-host01` (10.250.2.5) successfully
 - [ ] All nested VMs are Running: `Get-VM | Select-Object Name, State`
 - [ ] Cluster is healthy: `Get-ClusterNode -Cluster hvlab-clus01 | Select-Object Name, State` — all `Up`
 - [ ] All CSVs Online: `Get-ClusterSharedVolume -Cluster hvlab-clus01 | Select-Object Name, State`
@@ -14,7 +14,7 @@ Complete this checklist at least **30 minutes before** the session begins:
 
 ### WAC vMode (Session 1)
 
-- [ ] `https://10.250.1.46` loads without certificate error
+- [ ] `https://10.250.2.6` loads without certificate error
 - [ ] All 4 cluster nodes show as **Connected** in WAC vMode
 - [ ] At least 2 demo VMs are running on different cluster nodes (verify node placement)
 - [ ] PostgreSQL service running on `hvwac01`
@@ -28,9 +28,9 @@ Complete this checklist at least **30 minutes before** the session begins:
 
 ### Connectivity
 
-- [ ] From on-premises machine: `Test-Connection 10.250.1.46 -Count 2` succeeds
-- [ ] From on-premises machine: `Test-Connection 10.250.1.47 -Count 2` succeeds
-- [ ] Azure Local cluster node can reach `10.250.1.46`
+- [ ] From on-premises machine: `Test-Connection 10.250.2.6 -Count 2` succeeds
+- [ ] From on-premises machine: `Test-Connection 10.250.2.7 -Count 2` succeeds
+- [ ] Azure Local cluster node can reach `10.250.2.6`
 
 ---
 
@@ -77,15 +77,15 @@ After restoration:
 | `hvdc01` | Running | DC services started |
 | `hviscsi01` | Running | iSCSI target serving 4 LUNs |
 | `hvnode01-04` | Running | Cluster nodes Up, CSVs Online |
-| `hvwac01` | Running | WAC vMode web UI accessible at 10.250.1.46 |
-| `hvscvmm01` | Running | SCVMM console accessible at 10.250.1.47:8100 |
+| `hvwac01` | Running | WAC vMode web UI accessible at 10.250.2.6 |
+| `hvscvmm01` | Running | SCVMM console accessible at 10.250.2.7:8100 |
 
 ---
 
 ## Session 1 Walkthrough — WAC Virtualization Mode
 
 **Duration**: ~25 minutes  
-**URL**: `https://10.250.1.46`
+**URL**: `https://10.250.2.6`
 
 ### Talking Points Opening (2 min)
 
@@ -96,7 +96,7 @@ After restoration:
 
 ### Demo Step 1 — Cluster Overview (3 min)
 
-1. Open `https://10.250.1.46` from your demo machine
+1. Open `https://10.250.2.6` from your demo machine
 2. Log in as `AZRL\<admin-account>`
 3. Navigate to **Cluster** → `hvlab-clus01`
 4. Show the **Overview** tab: node health, CSV status, cluster events
@@ -243,7 +243,7 @@ Move-ClusterSharedVolume -Name "CSV-Vol1" -Node "hvnode01"
 
 ```powershell
 # Test port from on-premises
-Test-NetConnection -ComputerName "10.250.1.47" -Port 8100
+Test-NetConnection -ComputerName "10.250.2.7" -Port 8100
 
 # Restart SCVMM service on hvscvmm01
 Invoke-Command -ComputerName "172.16.10.40" -ScriptBlock {

@@ -38,8 +38,8 @@ WAC Virtualization Mode is a preview feature that requires the Windows Server 20
 | RAM | 16 GB |
 | OS | **Windows Server 2025** (mandatory) |
 | Mgmt NIC IP | `172.16.10.30` (vSwitch-Mgmt) |
-| External NIC IP | `10.250.1.46` (vSwitch-External — reachable from on-prem) |
-| WAC vMode Web UI | `https://10.250.1.46` (port 443) |
+| External NIC IP | `10.250.2.6` (vSwitch-External — reachable from on-prem) |
+| WAC vMode Web UI | `https://10.250.2.6` (port 443) |
 | PostgreSQL | localhost:5432 |
 | Domain | `azrl.mgmt` |
 
@@ -154,7 +154,7 @@ Get-NetFirewallRule -DisplayName "WAC vMode HTTPS Inbound" |
 
 From an on-premises or Azure machine:
 
-1. Open a browser and navigate to `https://10.250.1.46`
+1. Open a browser and navigate to `https://10.250.2.6`
 2. Accept the self-signed TLS certificate warning (expected during preview)
 3. Log in with a domain admin account: `AZRL\<your-admin-account>`
 

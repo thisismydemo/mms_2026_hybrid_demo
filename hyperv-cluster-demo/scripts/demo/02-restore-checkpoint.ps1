@@ -120,7 +120,7 @@ Write-Host @"
 Elapsed: $([int]((Get-Date) - (Get-Date)).TotalMinutes) min
 
 Access points:
-  WAC vmode:      https://10.250.1.46
-  SCVMM Console:  RDP to 10.250.1.47 → open vmm.exe
+  WAC vmode:      https://10.250.2.6
+  SCVMM Console:  RDP to 10.250.2.7 → open vmm.exe
   Cluster:        Failover Cluster Manager → hvlab-clus01.azrl.mgmt
 "@

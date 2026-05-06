@@ -24,7 +24,7 @@ jobs:
           # Verify all hosts are visible in WAC vmode
           $hosts = @('hvnode01','hvnode02','hvnode03','hvnode04','hviscsi01','hvdc01')
           Write-Host "WAC vmode managed hosts: $($hosts -join ', ')"
-          Write-Host "Verify connectivity at https://10.250.1.46 (hvwac01 external IP)"
+          Write-Host "Verify connectivity at https://10.250.2.6 (hvwac01 external IP)"
 
       - name: Summary
         shell: pwsh
@@ -34,7 +34,7 @@ jobs:
           "- WAC vmode installed on hvwac01 (WS2025)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "- PostgreSQL database configured" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "- All cluster hosts added as managed nodes" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "- Access at: **https://10.250.1.46** (from VNet or on-prem via BGP)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "- Access at: **https://10.250.2.6** (from VNet or on-prem via BGP)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "⚠️  TLS cert is self-signed (60-day expiry during preview)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "" | Out-File $env:GITHUB_STEP_SUMMARY -Append

@@ -133,9 +133,9 @@ Write-Log "WinNAT '$NatName' created for $NatSubnet"
 # correct nested VM via the External vSwitch.
 # (Azure NIC already has IP forwarding enabled via Bicep)
 # ─────────────────────────────────────────────────────────────────────────────
-Write-Log "IP forwarding is enabled on Azure NIC (set via Bicep). Host routing handles .46/.47 delivery."
-Write-Log "  10.250.1.46 → hvwac01 (assigned to its vNIC on vSwitch-External)"
-Write-Log "  10.250.1.47 → hvscvmm01 (assigned to its vNIC on vSwitch-External)"
+Write-Log "IP forwarding is enabled on Azure NIC (set via Bicep). Host routing handles .6/.7 delivery."
+Write-Log "  10.250.2.6 → hvwac01 (assigned to its vNIC on vSwitch-External)"
+Write-Log "  10.250.2.7 → hvscvmm01 (assigned to its vNIC on vSwitch-External)"
 Write-Log "  Nested VMs must configure their vNICs with these IPs for this to work."
 
 # ─────────────────────────────────────────────────────────────────────────────

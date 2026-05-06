@@ -35,13 +35,13 @@ ON-PREMISES SITE
                │  10.250.0.0/16                               │
                │                                              │
                │  Subnet: snet-lab-prodtech-eus-connectivity-mgmt│
-               │  10.250.1.0/24                               │
+               │  10.250.2.0/24                               │
                │                                              │
-               │  10.250.1.36  dc01.azrl.mgmt                 │
-               │  10.250.1.37  dc02.azrl.mgmt                 │
-               │  10.250.1.45  hv-host01   (host VM)          │
-               │  10.250.1.46  → hvwac01   (secondary IP)     │
-               │  10.250.1.47  → hvscvmm01 (secondary IP)     │
+               │  172.16.10.10  dc01.azrl.mgmt                 │
+               │  172.16.10.11  dc02.azrl.mgmt                 │
+               │  10.250.2.5  hv-host01   (host VM)          │
+               │  10.250.2.6  → hvwac01   (secondary IP)     │
+               │  10.250.2.7  → hvscvmm01 (secondary IP)     │
                └──────────────────────────────────────────────┘
 ```
 
@@ -73,9 +73,9 @@ This means the FortiGate's routing table has an entry:
 ```
 
 And since FortiGate propagates BGP routes to the on-premises network, **all on-premises clients automatically know how to reach any IP in 10.250.0.0/16**, including:
-- `10.250.1.45` (the host VM)
-- `10.250.1.46` (hvwac01 via secondary IP)
-- `10.250.1.47` (hvscvmm01 via secondary IP)
+- `10.250.2.5` (the host VM)
+- `10.250.2.6` (hvwac01 via secondary IP)
+- `10.250.2.7` (hvscvmm01 via secondary IP)
 
 ---
 
@@ -83,7 +83,7 @@ And since FortiGate propagates BGP routes to the on-premises network, **all on-p
 
 ### The Problem
 
-Azure routes traffic destined for `10.250.1.46` to the NIC that owns that IP — `nic-hv-host01`. The traffic arrives at the host OS. But the actual service (WAC vMode) is running on `hvwac01` at `172.16.10.30` — a private address inside the nested environment that is not reachable from outside the host.
+Azure routes traffic destined for `10.250.2.6` to the NIC that owns that IP — `nic-hv-host01`. The traffic arrives at the host OS. But the actual service (WAC vMode) is running on `hvwac01` at `172.16.10.30` — a private address inside the nested environment that is not reachable from outside the host.
 
 ### The Solution: IP Forwarding + Static Routes
 
@@ -93,14 +93,14 @@ Azure routes traffic destined for `10.250.1.46` to the NIC that owns that IP —
 4. **Nested VMs** are configured with the secondary IP on their External vSwitch NIC
 
 ```
-Traffic flow for 10.250.1.46 (hvwac01):
+Traffic flow for 10.250.2.6 (hvwac01):
 
 On-prem client → FortiGate → IPsec tunnel → Azure VPN GW
 → Azure routes to NIC nic-hv-host01 (which owns .46)
 → Azure NIC IP forwarding: forwards to host OS
 → Host OS routing table: 172.16.10.30 via 172.16.10.1 (host vNIC)
 → vSwitch-Mgmt → hvwac01 (172.16.10.30)
-→ hvwac01 responds from 10.250.1.46 (its External vSwitch NIC)
+→ hvwac01 responds from 10.250.2.6 (its External vSwitch NIC)
 → Reply: hvwac01 → vSwitch-External → Azure NIC → VPN tunnel → FortiGate → on-prem client
 ```
 
@@ -116,16 +116,16 @@ The Azure Local cluster at `192.168.211.x` can reach the nested VMs as follows:
 
 | Azure Local Source | Destination | Route | Protocol |
 |-------------------|-------------|-------|----------|
-| Any node (192.168.211.x) | `hv-host01` (10.250.1.45) | FortiGate → VPN → VNet | Any |
-| Any node | `hvwac01` (10.250.1.46) | FortiGate → VPN → NIC forwarding → nested VM | HTTPS/443 |
-| Any node | `hvscvmm01` (10.250.1.47) | FortiGate → VPN → NIC forwarding → nested VM | TCP/8100 |
+| Any node (192.168.211.x) | `hv-host01` (10.250.2.5) | FortiGate → VPN → VNet | Any |
+| Any node | `hvwac01` (10.250.2.6) | FortiGate → VPN → NIC forwarding → nested VM | HTTPS/443 |
+| Any node | `hvscvmm01` (10.250.2.7) | FortiGate → VPN → NIC forwarding → nested VM | TCP/8100 |
 | Any node | `hvnode01-04` (172.16.10.x) | **Not directly routable** | N/A |
 
 The cluster nodes (`hvnode01-04`) are on the private `172.16.10.0/24` network and are **not** advertised via BGP. They are managed through `hvwac01` and `hvscvmm01`, which are reachable.
 
 ### Demo Implication
 
-During the demo, show the Azure Local admin connecting to WAC vMode (`https://10.250.1.46`) and managing the nested Hyper-V cluster from their on-premises management station. This demonstrates the BGP connectivity working transparently.
+During the demo, show the Azure Local admin connecting to WAC vMode (`https://10.250.2.6`) and managing the nested Hyper-V cluster from their on-premises management station. This demonstrates the BGP connectivity working transparently.
 
 ---
 
@@ -165,12 +165,12 @@ route print | Select-String "10.250"
 # Should show: 10.250.0.0  255.255.0.0  <VPN tunnel gateway>
 
 # Test connectivity
-Test-Connection -ComputerName "10.250.1.45" -Count 4
-Test-Connection -ComputerName "10.250.1.46" -Count 4
-Test-Connection -ComputerName "10.250.1.47" -Count 4
+Test-Connection -ComputerName "10.250.2.5" -Count 4
+Test-Connection -ComputerName "10.250.2.6" -Count 4
+Test-Connection -ComputerName "10.250.2.7" -Count 4
 
 # Test WAC vMode HTTPS
-Invoke-WebRequest -Uri "https://10.250.1.46" -UseBasicParsing `
+Invoke-WebRequest -Uri "https://10.250.2.6" -UseBasicParsing `
     -SkipCertificateCheck -TimeoutSec 10
 ```
 
@@ -192,7 +192,7 @@ If a new VNet were created instead of using the existing one, the following woul
 
 ## Network Troubleshooting Reference
 
-### Symptom: On-prem can't reach 10.250.1.46
+### Symptom: On-prem can't reach 10.250.2.6
 
 ```powershell
 # Step 1: Confirm secondary IP is assigned to the NIC
@@ -209,9 +209,9 @@ az network nic show --name "nic-hv-host01" `
 Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters" |
     Select-Object IPEnableRouter
 
-# Step 4: Confirm hvwac01 has 10.250.1.46 on its External NIC
+# Step 4: Confirm hvwac01 has 10.250.2.6 on its External NIC
 Invoke-Command -ComputerName "172.16.10.30" -ScriptBlock {
-    Get-NetIPAddress | Where-Object IPAddress -eq "10.250.1.46"
+    Get-NetIPAddress | Where-Object IPAddress -eq "10.250.2.6"
 }
 ```
 

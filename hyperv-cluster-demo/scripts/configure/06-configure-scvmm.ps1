@@ -121,5 +121,5 @@ Next steps (via SCVMM console on hvscvmm01):
   4. Add library server (hvscvmm01 itself)
   5. Create Run As accounts from Key Vault service account passwords
 
-SCVMM console: Open via RDP to 10.250.1.47, launch vmm.exe
+SCVMM console: Open via RDP to 10.250.2.7, launch vmm.exe
 "@

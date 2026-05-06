@@ -75,5 +75,5 @@ jobs:
           "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "| Access | URL |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "|---|---|" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| WAC vmode | https://10.250.1.46 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| SCVMM console | Connect via RDP to 10.250.1.47 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| WAC vmode | https://10.250.2.6 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| SCVMM console | Connect via RDP to 10.250.2.7 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append

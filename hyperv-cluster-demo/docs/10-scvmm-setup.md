@@ -11,7 +11,7 @@
 | RAM | 32 GB |
 | OS | Windows Server 2022 |
 | Mgmt IP | `172.16.10.40` (vSwitch-Mgmt) |
-| External IP | `10.250.1.47` (vSwitch-External — reachable from on-prem) |
+| External IP | `10.250.2.7` (vSwitch-External — reachable from on-prem) |
 | SCVMM Console | Port 8100 |
 | SQL instance | `HVSCVMM01\SCVMM` (named instance) |
 | Domain | `azrl.mgmt` |

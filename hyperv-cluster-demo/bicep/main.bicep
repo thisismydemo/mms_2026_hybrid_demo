@@ -195,9 +195,9 @@ resource pip 'Microsoft.Network/publicIPAddresses@2023-09-01' = {
 
 // =============================================================================
 // Network Interface — IP forwarding enabled, 3 IP configs
-//   ipconfig-primary  → 10.250.1.45 + public IP  (host VM management)
-//   ipconfig-hvwac01  → 10.250.1.46               (routes to hvwac01 nested VM)
-//   ipconfig-hvscvmm01→ 10.250.1.47               (routes to hvscvmm01 nested VM)
+//   ipconfig-primary  → 10.250.2.5 + public IP  (host VM management)
+//   ipconfig-hvwac01  → 10.250.2.6               (routes to hvwac01 nested VM)
+//   ipconfig-hvscvmm01→ 10.250.2.7               (routes to hvscvmm01 nested VM)
 //
 // IP forwarding: Azure delivers traffic for .46/.47 to the host NIC.
 // Windows routing on the host forwards it to the External vSwitch → nested VM.

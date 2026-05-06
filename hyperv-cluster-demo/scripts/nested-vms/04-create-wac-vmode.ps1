@@ -14,8 +14,8 @@ param(
     [int]   $MemoryGB = 16,
     [int]   $OSDiskGB = 80,
     [string]$MgmtIP   = '172.16.10.30',
-    # External IP — secondary IP on Azure NIC, Azure-routable from on-prem via BGP
-    [string]$ExternalIP = '10.250.1.46'
+    # External IP — secondary IP on Azure NIC, Azure-routable
+    [string]$ExternalIP = '10.250.2.6'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,7 +35,7 @@ $vm = New-VM -Name $VMName `
     -Generation 2 `
     -MemoryStartupBytes ($MemoryGB * 1GB) `
     -VHDPath $osDisk `
-    -SwitchName 'vSwitch-External'   # Primary NIC on External — gets 10.250.1.46
+    -SwitchName 'vSwitch-External'   # Primary NIC on External — gets 10.250.2.6
 
 Set-VMProcessor -VM $vm -Count $vCPUs
 Set-VMMemory    -VM $vm -DynamicMemoryEnabled $false
@@ -55,7 +55,7 @@ Write-Host @"
 
 Post-install (MUST be WS2025):
   1. Install WS2025 from ISO (verify version in winver — must say Windows Server 2025)
-  2. External NIC: static IP $ExternalIP/24, gateway 10.250.1.1, DNS 10.250.1.36
+  2. External NIC: static IP $ExternalIP/27, gateway 10.250.2.1, DNS 172.16.10.10 (hvdc01)
   3. Mgmt NIC: $MgmtIP/24
   4. Join domain azrl.mgmt
   5. Run configure/04-configure-wac-vmode.ps1 to:

@@ -261,7 +261,7 @@ The deployment scripts join the host VM and all nested VMs to `azrl.mgmt`. The a
 | Requirement | Detail |
 |-------------|--------|
 | Domain | `azrl.mgmt` |
-| Existing DCs | `10.250.1.36` and `10.250.1.37` |
+| Existing DCs | `172.16.10.10` and `172.16.10.11` |
 | Account needed | An account with **Delegate control** to join computers to the target OUs (see [`docs/05-active-directory.md`](05-active-directory.md)) |
 | Stored as | `hvlab-domain-admin-username` and `hvlab-domain-admin-password` in Key Vault |
 
@@ -288,11 +288,11 @@ az network vnet subnet show `
   --query "{name:name, prefix:addressPrefix, available:availableIpAddressCount}"
 ```
 
-Confirm that IPs `10.250.1.45`, `10.250.1.46`, and `10.250.1.47` are not already allocated.
+Confirm that IPs `10.250.2.5`, `10.250.2.6`, and `10.250.2.7` are not already allocated.
 
 ```powershell
 # Check each IP
-foreach ($ip in @("10.250.1.45","10.250.1.46","10.250.1.47")) {
+foreach ($ip in @("10.250.2.5","10.250.2.6","10.250.2.7")) {
     $result = az network nic list `
         --query "[?contains(ipConfigurations[].privateIPAddress, '$ip')].[name]" `
         -o tsv
@@ -317,7 +317,7 @@ Use this checklist as a final gate before running workflow 01:
 - [ ] WS2022 ISO uploaded to `sthvlabisomms26/isos`
 - [ ] WS2025 ISO uploaded to `sthvlabisomms26/isos`
 - [ ] Storage account `sthvlabwitness01` created
-- [ ] IPs `10.250.1.45`, `.46`, `.47` confirmed available
+- [ ] IPs `10.250.2.5`, `.46`, `.47` confirmed available
 - [ ] VNet `vnet-lab-prodtech-eus-connectivity-hub` and subnet `snet-lab-prodtech-eus-connectivity-mgmt` confirmed existing
 - [ ] Domain admin account `svc-hvlab-deploy@azrl.mgmt` created with scoped OU delegation
 - [ ] GitHub runner token generated (≤1 hour before running workflow 02)

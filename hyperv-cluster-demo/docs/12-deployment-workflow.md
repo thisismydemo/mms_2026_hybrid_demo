@@ -19,7 +19,7 @@ az account show --query "{sub:id, state:state}" -o table
 # Expected: 00cd4357-ed45-4efb-bee0-10c467ff994b, Enabled
 
 # 2. Target IPs available
-foreach ($ip in @("10.250.1.45","10.250.1.46","10.250.1.47")) {
+foreach ($ip in @("10.250.2.5","10.250.2.6","10.250.2.7")) {
     $used = az network nic list --query "[].ipConfigurations[?privateIPAddress=='$ip'].privateIPAddress" -o tsv
     if ($used) { Write-Host "✗ $ip IN USE" -ForegroundColor Red }
     else        { Write-Host "✓ $ip available" -ForegroundColor Green }
@@ -82,7 +82,7 @@ az network nic show `
   --query "ipConfigurations[].{name:name, ip:privateIPAddress}" -o table
 
 # Test connectivity
-Test-Connection -ComputerName "10.250.1.45" -Count 4
+Test-Connection -ComputerName "10.250.2.5" -Count 4
 ```
 
 ### Common Failures
@@ -137,7 +137,7 @@ Check: `https://github.com/<org>/<repo>/settings/actions/runners`
 If the runner shows as **Offline** after 5 minutes:
 
 ```powershell
-# RDP to hv-host01 (10.250.1.45) and check
+# RDP to hv-host01 (10.250.2.5) and check
 # On the host VM:
 Get-Service -Name "actions.runner.*" | Select-Object Name, Status
 Start-Service -Name "actions.runner.*"
@@ -269,11 +269,11 @@ Get-ClusterQuorum -Cluster "hvlab-clus01"
 
 ```powershell
 # Test WAC vMode HTTPS endpoint
-Invoke-WebRequest -Uri "https://10.250.1.46" -SkipCertificateCheck -UseBasicParsing `
+Invoke-WebRequest -Uri "https://10.250.2.6" -SkipCertificateCheck -UseBasicParsing `
     -TimeoutSec 15 | Select-Object StatusCode
 
 # Test SCVMM console port
-Test-NetConnection -ComputerName "10.250.1.47" -Port 8100
+Test-NetConnection -ComputerName "10.250.2.7" -Port 8100
 ```
 
 ---

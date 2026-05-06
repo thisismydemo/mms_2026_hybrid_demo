@@ -15,13 +15,13 @@ This environment is a nested Hyper-V lab running entirely inside a single Azure 
 | vCPU | 104 |
 | RAM | 672 GB |
 | Local NVMe | ~3.8 TB (ephemeral — not for persistence) |
-| Azure NIC IP | `10.250.1.45` (static, primary) |
-| Secondary IP — WAC | `10.250.1.46` (mapped to `hvwac01`) |
-| Secondary IP — SCVMM | `10.250.1.47` (mapped to `hvscvmm01`) |
+| Azure NIC IP | `10.250.2.5` (static, primary) |
+| Secondary IP — WAC | `10.250.2.6` (mapped to `hvwac01`) |
+| Secondary IP — SCVMM | `10.250.2.7` (mapped to `hvscvmm01`) |
 | Subscription | `00cd4357-ed45-4efb-bee0-10c467ff994b` |
 | Resource Group | `rg-hvlab-mms26-eus-01` |
 | VNet | `vnet-lab-prodtech-eus-connectivity-hub` (`10.250.0.0/16`) |
-| Subnet | `snet-lab-prodtech-eus-connectivity-mgmt` (`10.250.1.0/24`) |
+| Subnet | `snet-lab-prodtech-eus-connectivity-mgmt` (`10.250.2.0/24`) |
 
 ---
 
@@ -35,8 +35,8 @@ This environment is a nested Hyper-V lab running entirely inside a single Azure 
 | `hvnode02` | 16 | 64 GB | `172.16.10.22` | — | WS2022 | Cluster Node 2 |
 | `hvnode03` | 16 | 64 GB | `172.16.10.23` | — | WS2022 | Cluster Node 3 |
 | `hvnode04` | 16 | 64 GB | `172.16.10.24` | — | WS2022 | Cluster Node 4 |
-| `hvwac01` | 4 | 16 GB | `172.16.10.30` | `10.250.1.46` | **WS2025** | WAC vMode |
-| `hvscvmm01` | 8 | 32 GB | `172.16.10.40` | `10.250.1.47` | WS2022 | SCVMM 2025 |
+| `hvwac01` | 4 | 16 GB | `172.16.10.30` | `10.250.2.6` | **WS2025** | WAC vMode |
+| `hvscvmm01` | 8 | 32 GB | `172.16.10.40` | `10.250.2.7` | WS2022 | SCVMM 2025 |
 
 **Total nested vCPU**: 70 (of 104 available) | **Total nested RAM**: 296 GB (of 672 GB available)
 
@@ -48,7 +48,7 @@ Six virtual switches are configured on the host VM:
 
 | vSwitch | Type | Network | Purpose |
 |---------|------|---------|---------|
-| `vSwitch-External` | External (bound to Azure NIC) | `10.250.1.0/24` | Nested VM Azure reachability / secondary IPs |
+| `vSwitch-External` | External (bound to Azure NIC) | `10.250.2.0/24` | Nested VM Azure reachability / secondary IPs |
 | `vSwitch-Mgmt` | Internal | `172.16.10.0/24` | Management traffic, domain join, RDP |
 | `vSwitch-Migration` | Private | `172.16.20.0/24` | Live migration traffic |
 | `vSwitch-Storage` | Private | `172.16.30.0/24` | iSCSI storage traffic (MPIO) |
@@ -74,12 +74,12 @@ AZURE VPN GATEWAY: ASN 65422
           |
           | VNet: vnet-lab-prodtech-eus-connectivity-hub (10.250.0.0/16)
           |
-SUBNET: snet-lab-prodtech-eus-connectivity-mgmt (10.250.1.0/24)
-  ├── 10.250.1.36  DC1 (existing — azrl.mgmt)
-  ├── 10.250.1.37  DC2 (existing — azrl.mgmt)
-  ├── 10.250.1.45  hv-host01  ← HOST VM (Standard_E104ids_v5)
-  ├── 10.250.1.46  → forwarded into host → hvwac01  (WS2025, WAC vMode)
-  └── 10.250.1.47  → forwarded into host → hvscvmm01 (WS2022, SCVMM 2025)
+SUBNET: snet-lab-prodtech-eus-connectivity-mgmt (10.250.2.0/24)
+  ├── 172.16.10.10  DC1 (existing — azrl.mgmt)
+  ├── 172.16.10.11  DC2 (existing — azrl.mgmt)
+  ├── 10.250.2.5  hv-host01  ← HOST VM (Standard_E104ids_v5)
+  ├── 10.250.2.6  → forwarded into host → hvwac01  (WS2025, WAC vMode)
+  └── 10.250.2.7  → forwarded into host → hvscvmm01 (WS2022, SCVMM 2025)
 
 INSIDE HOST VM (Hyper-V nested)
   vSwitch-Mgmt (172.16.10.0/24)
@@ -89,8 +89,8 @@ INSIDE HOST VM (Hyper-V nested)
   ├── 172.16.10.22   hvnode02    (Cluster Node 2)
   ├── 172.16.10.23   hvnode03    (Cluster Node 3)
   ├── 172.16.10.24   hvnode04    (Cluster Node 4)
-  ├── 172.16.10.30   hvwac01     + vSwitch-External NIC → 10.250.1.46
-  └── 172.16.10.40   hvscvmm01   + vSwitch-External NIC → 10.250.1.47
+  ├── 172.16.10.30   hvwac01     + vSwitch-External NIC → 10.250.2.6
+  └── 172.16.10.40   hvscvmm01   + vSwitch-External NIC → 10.250.2.7
 
   vSwitch-Migration (172.16.20.0/24)
   └── hvnode01-04: .21-.24
@@ -114,9 +114,9 @@ A new VNet or subnet is **not created** for this demo. The host VM is placed dir
 
 1. **BGP route advertisement already exists**: FortiGate-90G (ASN 65421) peers with the Azure VPN Gateway (ASN 65422) and advertises `10.250.0.0/16` to on-premises. This means any IP in that range is routable from the Azure Local cluster and corporate network without any additional routing configuration.
 
-2. **Secondary IPs inherit the advertisement**: When `10.250.1.46` and `10.250.1.47` are assigned as secondary IPs on the host's Azure NIC and forwarded into the nested VMs, those VMs become reachable from on-prem at those addresses automatically.
+2. **Secondary IPs inherit the advertisement**: When `10.250.2.6` and `10.250.2.7` are assigned as secondary IPs on the host's Azure NIC and forwarded into the nested VMs, those VMs become reachable from on-prem at those addresses automatically.
 
-3. **Existing DCs are reachable**: `hvdc01` inside the nested environment needs to replicate with the existing DCs at `10.250.1.36` and `10.250.1.37`. Placing the host in the same subnet ensures low-latency, direct replication.
+3. **Existing DCs are reachable**: `hvdc01` inside the nested environment needs to replicate with the existing DCs at `172.16.10.10` and `172.16.10.11`. Placing the host in the same subnet ensures low-latency, direct replication.
 
 4. **No UDR required**: Because the route is BGP-advertised and the host VM is the destination for `.46`/`.47`, Azure's NIC-level IP forwarding handles the traffic. No User Defined Route table is needed.
 
@@ -130,9 +130,9 @@ See [`docs/11-bgp-routing-connectivity.md`](11-bgp-routing-connectivity.md) for 
 
 | Source | Destination | Path |
 |--------|-------------|------|
-| Azure Local cluster (192.168.211.x) | `hv-host01` (10.250.1.45) | BGP → VPN GW → Azure VNet → Subnet |
-| Azure Local cluster | `hvwac01` (10.250.1.46) | BGP → VPN GW → NIC secondary IP → IP forwarding → nested VM |
-| Azure Local cluster | `hvscvmm01` (10.250.1.47) | BGP → VPN GW → NIC secondary IP → IP forwarding → nested VM |
+| Azure Local cluster (192.168.211.x) | `hv-host01` (10.250.2.5) | BGP → VPN GW → Azure VNet → Subnet |
+| Azure Local cluster | `hvwac01` (10.250.2.6) | BGP → VPN GW → NIC secondary IP → IP forwarding → nested VM |
+| Azure Local cluster | `hvscvmm01` (10.250.2.7) | BGP → VPN GW → NIC secondary IP → IP forwarding → nested VM |
 | Azure Local cluster | `hvnode01-04` (172.16.10.x) | Not directly routable — manage via `hvwac01` or `hvscvmm01` |
 
 ### From Inside Host VM to Nested VMs
@@ -165,8 +165,8 @@ Quorum:
   └── Cloud Witness → Azure Blob (sthvlabwitness01)
 
 Management:
-  ├── WAC Virtualization Mode  → hvwac01  (10.250.1.46)
-  └── SCVMM 2025               → hvscvmm01 (10.250.1.47)
+  ├── WAC Virtualization Mode  → hvwac01  (10.250.2.6)
+  └── SCVMM 2025               → hvscvmm01 (10.250.2.7)
 ```
 
 ---
@@ -174,8 +174,8 @@ Management:
 ## Active Directory
 
 - **Domain**: `azrl.mgmt`
-- **Existing DCs**: `10.250.1.36`, `10.250.1.37` (do not modify)
-- **Replica DC**: `hvdc01` inside the nested environment — required so that cluster nodes (on the isolated 172.16.x.x networks) can authenticate via Kerberos without depending on a WAN path to `10.250.1.36/.37`
+- **Existing DCs**: `172.16.10.10`, `172.16.10.11` (do not modify)
+- **Replica DC**: `hvdc01` inside the nested environment — required so that cluster nodes (on the isolated 172.16.x.x networks) can authenticate via Kerberos without depending on a WAN path to `172.16.10.10/.37`
 - The host VM (`hv-host01`) joins `azrl.mgmt` using the existing DCs directly
 
 ---

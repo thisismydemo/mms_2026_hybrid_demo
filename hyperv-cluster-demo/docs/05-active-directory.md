@@ -6,16 +6,16 @@
 |----------|-------|
 | Domain | `azrl.mgmt` |
 | Forest functional level | Windows Server 2016 or higher |
-| Existing DCs | `dc01.azrl.mgmt` (`10.250.1.36`), `dc02.azrl.mgmt` (`10.250.1.37`) |
+| Existing DCs | `dc01.azrl.mgmt` (`172.16.10.10`), `dc02.azrl.mgmt` (`172.16.10.11`) |
 | Replica DC (nested) | `hvdc01.azrl.mgmt` (`172.16.10.10`) |
 
-> **Do not modify the existing DCs** at `10.250.1.36` and `10.250.1.37`. They serve production workloads. All demo-specific OU structure and accounts are self-contained under a dedicated OU.
+> **Do not modify the existing DCs** at `172.16.10.10` and `172.16.10.11`. They serve production workloads. All demo-specific OU structure and accounts are self-contained under a dedicated OU.
 
 ---
 
 ## Why a Replica DC Inside the Nested Environment
 
-The 4 cluster nodes (`hvnode01-04`) live on the isolated `172.16.10.0/24` management network with no direct routing to `10.250.1.36` or `10.250.1.37` (except via WinNAT, which does not preserve Kerberos tickets properly). Without a local DC:
+The 4 cluster nodes (`hvnode01-04`) live on the isolated `172.16.10.0/24` management network with no direct routing to `172.16.10.10` or `172.16.10.11` (except via WinNAT, which does not preserve Kerberos tickets properly). Without a local DC:
 
 - Kerberos authentication for cluster node domain joins would traverse WinNAT — unreliable
 - Live migration Kerberos constrained delegation would fail intermittently
@@ -28,7 +28,7 @@ The 4 cluster nodes (`hvnode01-04`) live on the isolated `172.16.10.0/24` manage
 
 ## Host VM Domain Join
 
-The host VM (`hv-host01`) joins `azrl.mgmt` directly using the existing DCs, since it has a NIC in `10.250.1.0/24` and can reach them:
+The host VM (`hv-host01`) joins `azrl.mgmt` directly using the existing DCs, since it has a NIC in `10.250.2.0/24` and can reach them:
 
 ```powershell
 # On the host VM after deployment
@@ -180,7 +180,7 @@ Add-ADGroupMember -Identity "sg-hvlab-admins" -Members "svc-hvlab-deploy"
 
 ## Replica DC (hvdc01) Promotion
 
-`hvdc01` is promoted as a replica DC for the `azrl.mgmt` domain. It replicates with the existing DCs at `10.250.1.36` and `10.250.1.37` over the External vSwitch (which has Azure NIC connectivity).
+`hvdc01` is promoted as a replica DC for the `azrl.mgmt` domain. It replicates with the existing DCs at `172.16.10.10` and `172.16.10.11` over the External vSwitch (which has Azure NIC connectivity).
 
 ### Prerequisites on hvdc01 Before Promotion
 
@@ -192,7 +192,7 @@ New-NetIPAddress -IPAddress "172.16.10.10" -PrefixLength 24 `
 
 # Point DNS at existing DCs for initial replication
 Set-DnsClientServerAddress -InterfaceAlias "Ethernet" `
-  -ServerAddresses "10.250.1.36","10.250.1.37"
+  -ServerAddresses "172.16.10.10","172.16.10.11"
 
 # Install AD DS role
 Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
@@ -222,7 +222,7 @@ After `hvdc01` is promoted, update DNS on all nested VMs to point to it as prima
 ```powershell
 # Run on each nested VM
 Set-DnsClientServerAddress -InterfaceAlias "Ethernet" `
-  -ServerAddresses "172.16.10.10","10.250.1.36"
+  -ServerAddresses "172.16.10.10","172.16.10.10"
 ```
 
 ---

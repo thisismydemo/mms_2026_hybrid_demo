@@ -1,20 +1,20 @@
 ##############################################################################
 # 02-verify-ip-availability.ps1
-# Confirm that 10.250.1.45/.46/.47/.48 are free in the management subnet
+# Confirm that 10.250.2.5/.6/.7/.8 are free in the hvlab subnet
 # before Bicep deployment locks them in as static IPs.
 #
 # Prerequisites:
 #   az login --tenant a9b67171-3fbb-45bf-8394-eb56d02a86e4
-#   az account set --subscription 2caa0b8a-a1d6-4f0c-8c03-861787b8315c  # tplabs hub sub
+#   az account set --subscription 00cd4357-ed45-4efb-bee0-10c467ff994b  # deploy sub
 ##############################################################################
 
 param(
-    [string]$VNetResourceGroup = 'rg-c01-hub-eus-01',
-    [string]$VNetName          = 'vnet-lab-prodtech-eus-connectivity-hub',
-    [string]$SubnetName        = 'snet-lab-prodtech-eus-connectivity-mgmt',
-    [string[]]$IpsToCheck      = @('10.250.1.45','10.250.1.46','10.250.1.47','10.250.1.48'),
-    # Hub subscription (where the VNet lives)
-    [string]$HubSubscriptionId = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
+    [string]$VNetResourceGroup = 'rg-hvlab-mms26-eus-01',
+    [string]$VNetName          = 'vnet-hvlab-mms26-eus-01',
+    [string]$SubnetName        = 'snet-hvlab-mms26-eus-01',
+    [string[]]$IpsToCheck      = @('10.250.2.5','10.250.2.6','10.250.2.7','10.250.2.8'),
+    # Deploy subscription (where the VNet lives)
+    [string]$HubSubscriptionId = '00cd4357-ed45-4efb-bee0-10c467ff994b'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,10 +56,10 @@ foreach ($ip in $IpsToCheck) {
     if ($inUse -or $azureReserved) { $allClear = $false }
 
     $label = switch ($ip) {
-        '10.250.1.45' { 'vm-hvlab-host01-eus-01 (primary)' }
-        '10.250.1.46' { 'hvwac01 secondary IP' }
-        '10.250.1.47' { 'hvscvmm01 secondary IP' }
-        '10.250.1.48' { 'reserved/spare' }
+        '10.250.2.5' { 'vm-hvlab-host01-eus-01 (primary)' }
+        '10.250.2.6' { 'hvwac01 secondary IP' }
+        '10.250.2.7' { 'hvscvmm01 secondary IP' }
+        '10.250.2.8' { 'reserved/spare' }
         default       { '' }
     }
 
@@ -76,5 +76,5 @@ if ($allClear) {
     Write-Host "✅ All IPs are available. Safe to deploy." -ForegroundColor Green
 } else {
     Write-Host "❌ One or more IPs are in use. Update ip_allocation in variables.yml before deploying." -ForegroundColor Red
-    Write-Host "   Suggested alternative start: 10.250.1.50" -ForegroundColor Yellow
+    Write-Host "   Suggested alternative start: 10.250.2.10" -ForegroundColor Yellow
 }

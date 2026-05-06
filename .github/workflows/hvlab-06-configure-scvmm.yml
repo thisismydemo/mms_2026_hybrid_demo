@@ -22,7 +22,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "SCVMM host addition handled inside 06-configure-scvmm.ps1"
-          Write-Host "SCVMM console access: https://10.250.1.47 (hvscvmm01 external IP)"
+          Write-Host "SCVMM console access: https://10.250.2.7 (hvscvmm01 external IP)"
 
       - name: Summary
         shell: pwsh

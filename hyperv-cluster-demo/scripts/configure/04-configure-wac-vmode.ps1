@@ -74,7 +74,7 @@ Write-Host @"
 
 ✅ WAC Virtualization Mode installed on $WacServer.
 
-Access URL: https://10.250.1.46
+Access URL: https://10.250.2.6
   - Accept the self-signed certificate (60-day expiry during preview)
   - Log in with domain admin credentials (azrl\<admin>)
 

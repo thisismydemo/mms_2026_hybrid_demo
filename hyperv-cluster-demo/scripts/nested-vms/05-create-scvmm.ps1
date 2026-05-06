@@ -12,7 +12,7 @@ param(
     [int]   $OSDiskGB   = 80,
     [int]   $DataDiskGB = 100,   # SCVMM library + SQL data
     [string]$MgmtIP     = '172.16.10.40',
-    [string]$ExternalIP = '10.250.1.47'
+    [string]$ExternalIP = '10.250.2.7'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -29,7 +29,7 @@ $vm = New-VM -Name $VMName `
     -Generation 2 `
     -MemoryStartupBytes ($MemoryGB * 1GB) `
     -VHDPath $osDisk `
-    -SwitchName 'vSwitch-External'   # Primary NIC → 10.250.1.47
+    -SwitchName 'vSwitch-External'   # Primary NIC → 10.250.2.7
 
 Set-VMProcessor -VM $vm -Count $vCPUs
 Set-VMMemory    -VM $vm -DynamicMemoryEnabled $false
@@ -48,7 +48,7 @@ Write-Host @"
 
 Post-install:
   1. Install WS2022 from ISO
-  2. External NIC: $ExternalIP/24, gateway 10.250.1.1, DNS 10.250.1.36
+  2. External NIC: $ExternalIP/27, gateway 10.250.2.1, DNS 172.16.10.10 (hvdc01)
   3. Mgmt NIC: $MgmtIP/24
   4. Initialize D:\ drive (data disk) for SCVMM library + SQL data files
   5. Join domain azrl.mgmt

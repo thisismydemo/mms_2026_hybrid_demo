@@ -20,12 +20,12 @@ This repository contains everything needed to deploy and operate a **nested Hype
 ```
 Azure Subscription 00cd4357-ed45-4efb-bee0-10c467ff994b
   Resource Group: rg-hvlab-mms26-eus-01
-    Host VM: hv-host01  10.250.1.45  (Standard_E104ids_v5)
+    Host VM: hv-host01  10.250.2.5  (Standard_E104ids_v5)
       ├── hvdc01       172.16.10.10   AD Replica DC
       ├── hviscsi01    172.16.30.10   iSCSI Target
       ├── hvnode01-04  172.16.10.21-24  Cluster Nodes
-      ├── hvwac01      172.16.10.30 + secondary 10.250.1.46  WAC vMode (WS2025)
-      └── hvscvmm01    172.16.10.40 + secondary 10.250.1.47  SCVMM 2025
+      ├── hvwac01      172.16.10.30 + secondary 10.250.2.6  WAC vMode (WS2025)
+      └── hvscvmm01    172.16.10.40 + secondary 10.250.2.7  SCVMM 2025
 ```
 
 > BGP: FortiGate-90G (ASN 65421) ↔ Azure VPN GW (ASN 65422) — 10.250.0.0/16 advertised on-prem, so nested VMs with secondary IPs in this range are reachable directly.

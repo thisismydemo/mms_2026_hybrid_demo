@@ -66,9 +66,9 @@ jobs:
         shell: pwsh
         run: |
           try {
-            $resp = Invoke-WebRequest -Uri 'https://10.250.1.46' -UseBasicParsing `
+            $resp = Invoke-WebRequest -Uri 'https://10.250.2.6' -UseBasicParsing `
               -SkipCertificateCheck -TimeoutSec 10
-            Write-Host "  ✅ WAC vmode HTTPS (10.250.1.46) — $($resp.StatusCode)"
+            Write-Host "  ✅ WAC vmode HTTPS (10.250.2.6) — $($resp.StatusCode)"
           } catch {
             Write-Host "  ❌ WAC vmode HTTPS unreachable: $_" -ForegroundColor Red
           }
@@ -100,6 +100,6 @@ jobs:
           "" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "| Access Point | URL |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
           "|---|---|" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| WAC vmode | https://10.250.1.46 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| SCVMM | RDP to 10.250.1.47 (hvscvmm01) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "| Host VM RDP | 10.250.1.45 (or via public IP) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| WAC vmode | https://10.250.2.6 |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| SCVMM | RDP to 10.250.2.7 (hvscvmm01) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          "| Host VM RDP | 10.250.2.5 (or via public IP) |" | Out-File $env:GITHUB_STEP_SUMMARY -Append

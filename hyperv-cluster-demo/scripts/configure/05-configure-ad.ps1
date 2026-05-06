@@ -1,7 +1,7 @@
 ##############################################################################
 # 05-configure-ad.ps1  — Create OUs, service accounts, and security groups
 # Run from: self-hosted runner OR any domain-joined machine with AD RSAT
-# Target DC: hvdc01 (replica) or 10.250.1.36 (existing DC1)
+# Target DC: hvdc01 (forest root DC, 172.16.10.10 on vSwitch-Mgmt)
 ##############################################################################
 
 param(
