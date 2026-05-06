@@ -32,7 +32,15 @@ jobs:
       - name: Summary
         shell: pwsh
         run: |
-          "## Post-Bootstrap Complete" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "- ISOs downloading to D:\HyperVStorage\ISOs\" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "- Azure Arc agent installed" | Out-File $env:GITHUB_STEP_SUMMARY -Append
-          "**Next step:** Run HVLab 03 — Deploy Nested VMs" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          $summary = $env:GITHUB_STEP_SUMMARY
+          if (-not $summary) {
+            $summary = 'C:\Temp\hvlab-post-bootstrap-summary.md'
+            New-Item -ItemType Directory -Path (Split-Path $summary) -Force | Out-Null
+          }
+
+          @(
+            '## Post-Bootstrap Complete'
+            '- ISOs downloading to D:\HyperVStorage\ISOs'
+            '- Azure Arc agent install attempted'
+            '**Next step:** Run HVLab 03 - Deploy Nested VMs'
+          ) | Out-File $summary -Append
