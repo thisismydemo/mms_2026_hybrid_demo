@@ -31,31 +31,23 @@ param adminUsername string = 'hvlabadmin'
 @secure()
 param adminPassword string
 
-@description('Subscription containing the existing hub VNet (tplabs sub)')
-param vnetSubscriptionId string = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
-
-@description('Resource group containing the existing hub VNet')
-param vnetResourceGroup string = 'rg-azrlmgmt-dev-eus-01'
-
-@description('Existing VNet name')
-param vnetName string = 'vnet-azrl-dev-eus-01'
-
-@description('Existing management subnet — 10.250.1.32/27, contains hvlab IPs .45/.46/.47')
-param subnetName string = 'snet-azrl-dev-eus-01'
-
 // Resource name variables (CAF)
 var vmName           = 'vm-hvlab-host01-eus-01'
 var nicName          = 'nic-hvlab-host01-eus-01'
 var pipName          = 'pip-hvlab-host01-eus-01'
 var nsgName          = 'nsg-hvlab-host01-eus-01'
+var vnetName         = 'vnet-hvlab-mms26-eus-01'
+var subnetName       = 'snet-hvlab-mms26-eus-01'
 var osDiskName       = 'disk-hvlab-host01-os-eus-01'
 var identityName     = 'mi-hvlab-host01-eus-01'
 var storageAcctName  = 'sthvlabwitness01'   // Cloud Witness — no hyphens, max 24 chars
 
-// IP allocation (all on existing subnet 10.250.1.0/24)
-var primaryIp     = '10.250.1.45'   // host VM
-var wacIp         = '10.250.1.46'   // secondary → hvwac01 nested VM
-var scvmmIp       = '10.250.1.47'   // secondary → hvscvmm01 nested VM
+// IP allocation (10.250.2.0/24 — local VNet in deploy sub, no cross-sub reference)
+var vnetAddressPrefix   = '10.250.2.0/24'
+var subnetAddressPrefix = '10.250.2.0/27'
+var primaryIp     = '10.250.2.5'    // host VM
+var wacIp         = '10.250.2.6'    // secondary → hvwac01 nested VM
+var scvmmIp       = '10.250.2.7'    // secondary → hvscvmm01 nested VM
 
 var tags = {
   environment: 'lab'
@@ -68,11 +60,26 @@ var tags = {
 }
 
 // =============================================================================
-// Subnet resource ID — cross-subscription reference (BGP routing requirement)
-// Using resourceId() directly avoids Bicep generating extensionResourceId()
-// which produces the wrong resource ID for child resources across subscriptions.
+// VNet + Subnet — created in deploy sub, no cross-subscription reference
 // =============================================================================
-var subnetResourceId = resourceId(vnetSubscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetName)
+resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+  name: vnetName
+  location: location
+  tags: tags
+  properties: {
+    addressSpace: { addressPrefixes: [ vnetAddressPrefix ] }
+    subnets: [
+      {
+        name: subnetName
+        properties: {
+          addressPrefix: subnetAddressPrefix
+          networkSecurityGroup: { id: nsg.id }
+        }
+      }
+    ]
+  }
+}
+
 
 // =============================================================================
 // User-assigned Managed Identity
@@ -202,7 +209,6 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
   properties: {
     enableIPForwarding: true
     enableAcceleratedNetworking: true
-    networkSecurityGroup: { id: nsg.id }
     ipConfigurations: [
       {
         name: 'ipconfig-primary'
@@ -210,7 +216,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
           primary: true
           privateIPAddress: primaryIp
           privateIPAllocationMethod: 'Static'
-          subnet: { id: subnetResourceId }
+          subnet: { id: '${vnet.id}/subnets/${subnetName}' }
           publicIPAddress: { id: pip.id }
         }
       }
@@ -220,7 +226,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
           primary: false
           privateIPAddress: wacIp
           privateIPAllocationMethod: 'Static'
-          subnet: { id: subnetResourceId }
+          subnet: { id: '${vnet.id}/subnets/${subnetName}' }
         }
       }
       {
@@ -229,7 +235,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
           primary: false
           privateIPAddress: scvmmIp
           privateIPAllocationMethod: 'Static'
-          subnet: { id: subnetResourceId }
+          subnet: { id: '${vnet.id}/subnets/${subnetName}' }
         }
       }
     ]
