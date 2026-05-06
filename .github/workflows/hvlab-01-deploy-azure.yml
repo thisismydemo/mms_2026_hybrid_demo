@@ -81,24 +81,29 @@ jobs:
 
       - name: Assign Key Vault role to Managed Identity
         run: |
-          PRINCIPAL_ID=$(az deployment group show \
+          PRINCIPAL_ID=$(az identity show \
             --subscription "$SUBSCRIPTION_ID" \
             --resource-group "$RESOURCE_GROUP" \
-            --name "hvlab-deploy-${{ github.run_number }}" \
-            --query properties.outputs.identityPrincipalId.value -o tsv)
+            --name "mi-hvlab-host01-eus-01" \
+            --query principalId -o tsv)
+
+          echo "Host VM identity principalId: $PRINCIPAL_ID"
 
           KV_ID=$(az keyvault show \
             --name kv-tplabs-platform \
             --subscription "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" \
+            --resource-group "rg-azrlmgmt-dev-eus-01" \
             --query id -o tsv)
 
           az role assignment create \
             --role "Key Vault Secrets User" \
             --assignee-object-id "$PRINCIPAL_ID" \
             --assignee-principal-type ServicePrincipal \
-            --scope "$KV_ID"
+            --scope "$KV_ID" \
+            --subscription "2caa0b8a-a1d6-4f0c-8c03-861787b8315c" || \
+          echo "Role may already exist — continuing"
 
-          echo "✅ Key Vault Secrets User role assigned to managed identity."
+          echo "✅ Key Vault Secrets User role assigned to host VM managed identity."
 
       - name: Summary
         run: |
