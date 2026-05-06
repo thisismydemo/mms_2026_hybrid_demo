@@ -60,22 +60,23 @@ jobs:
             --template-file "$TEMPLATE_FILE" \
             --parameters "$PARAMS_FILE" \
             --parameters location="${{ github.event.inputs.location || 'eastus' }}" \
-                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E104ids_v5' }}"
+                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E48ds_v5' }}"
 
       - name: Deploy Bicep
         id: deploy
         run: |
+          set -euo pipefail
           az deployment group create \
             --subscription "$SUBSCRIPTION_ID" \
             --resource-group "$RESOURCE_GROUP" \
             --template-file "$TEMPLATE_FILE" \
             --parameters "$PARAMS_FILE" \
             --parameters location="${{ github.event.inputs.location || 'eastus' }}" \
-                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E104ids_v5' }}" \
+                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E48ds_v5' }}" \
             --name "hvlab-deploy-${{ github.run_number }}" \
-            --output json | tee /tmp/deploy-output.json
+            --output json > /tmp/deploy-output.json
 
-          PUBLIC_IP=$(cat /tmp/deploy-output.json | jq -r '.properties.outputs.publicIpAddress.value')
+          PUBLIC_IP=$(jq -r '.properties.outputs.publicIpAddress.value' /tmp/deploy-output.json)
           echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
           echo "✅ Host VM public IP: $PUBLIC_IP"
 
