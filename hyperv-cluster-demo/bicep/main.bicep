@@ -16,11 +16,12 @@ param location string = 'eastus'
 
 @description('VM size — must support nested virtualization. E104ids_v5 = 104 vCPU / 672 GB / isolated hardware')
 @allowed([
+  'Standard_E48ds_v5'     // quota fit: 48 vCPU / 384 GB (sub limit is 50 vCPU)
   'Standard_E104ids_v5'   // preferred: 104 vCPU / 672 GB / isolated / ~3.8 TB local NVMe
   'Standard_E96ds_v5'     // fallback: 96 vCPU / 672 GB / shared hardware
-  'Standard_E64ds_v5'     // last resort: 64 vCPU / 512 GB (reduce node vCPUs to 12)
+  'Standard_E64ds_v5'     // last resort: 64 vCPU / 512 GB
 ])
-param vmSize string = 'Standard_E104ids_v5'
+param vmSize string = 'Standard_E48ds_v5'
 
 @description('Admin username for the host VM')
 param adminUsername string = 'hvlabadmin'
