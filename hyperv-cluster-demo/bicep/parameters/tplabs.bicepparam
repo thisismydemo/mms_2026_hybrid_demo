@@ -39,7 +39,7 @@ param adminUsername = 'hvlabadmin'
 // NOTE: getSecret() subscription must match where the KV actually lives (tplabs hub sub, NOT the deployment sub)
 param adminPassword = getSecret(
   '2caa0b8a-a1d6-4f0c-8c03-861787b8315c',   // tplabs subscription — where kv-tplabs-platform lives
-  'rg-c01-platform-eus-01',
+  'rg-azrlmgmt-dev-eus-01',
   'kv-tplabs-platform',
   'hvlab-host01-admin-password'
 )

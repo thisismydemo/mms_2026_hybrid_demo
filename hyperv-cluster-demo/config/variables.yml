@@ -564,11 +564,12 @@ active_directory:
 # =============================================================================
 key_vault:
   name:           kv-tplabs-platform     # existing tplabs Key Vault — reuse
-  resource_group: rg-c01-platform-eus-01  # existing
+  resource_group: rg-azrlmgmt-dev-eus-01  # existing
   # Pre-stage ALL of these secrets before running any deployment workflow:
   secrets_required:
     - hvlab-host01-admin-password
     - hvlab-github-runner-token
+    - hvlab-github-pat-full          # classic PAT with full repo+workflow+admin scopes
     - hvwac01-pg-password
     - svc-hvlab-deploy-password
     - svc-scvmm-svc-password
@@ -586,7 +587,7 @@ identity:
     rg:   rg-hvlab-mms26-eus-01
     roles:
       - role:  Key Vault Secrets User
-        scope: "/subscriptions/00cd4357-ed45-4efb-bee0-10c467ff994b/resourceGroups/rg-c01-platform-eus-01/providers/Microsoft.KeyVault/vaults/kv-tplabs-platform"
+        scope: "/subscriptions/00cd4357-ed45-4efb-bee0-10c467ff994b/resourceGroups/rg-azrlmgmt-dev-eus-01/providers/Microsoft.KeyVault/vaults/kv-tplabs-platform"
       - role:  Reader
         scope: "/subscriptions/00cd4357-ed45-4efb-bee0-10c467ff994b"
 
