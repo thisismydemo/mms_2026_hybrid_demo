@@ -2,6 +2,10 @@ name: "HVLab 02 — Bootstrap Host VM"
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["HVLab 01 — Deploy Azure Infrastructure"]
+    types: [completed]
+    branches: [main]
 
 env:
   SUBSCRIPTION_ID: "00cd4357-ed45-4efb-bee0-10c467ff994b"
