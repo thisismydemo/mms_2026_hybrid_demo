@@ -10,9 +10,10 @@ on:
       vm_size:
         description: "VM size"
         required: true
-        default: "Standard_E104ids_v5"
+        default: "Standard_E48ds_v5"
         type: choice
         options:
+          - Standard_E48ds_v5
           - Standard_E104ids_v5
           - Standard_E96ds_v5
           - Standard_E64ds_v5
