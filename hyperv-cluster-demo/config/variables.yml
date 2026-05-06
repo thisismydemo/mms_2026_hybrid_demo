@@ -81,7 +81,7 @@ azure_platform:
 azure_networking:
   use_existing_vnet: true
   vnet_name: vnet-lab-prodtech-eus-connectivity-hub
-  vnet_resource_group: rg-c01-hub-eus-01       # existing hub RG (tplabs)
+  vnet_resource_group: rg-lab-prodtech-eus-connectivity-hub   # existing hub RG (tplabs sub 2caa0b8a-a1d6-4f0c-8c03-861787b8315c)
   vnet_address_space: 10.250.0.0/16
   subnet:
     name: snet-lab-prodtech-eus-connectivity-mgmt

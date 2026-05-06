@@ -47,6 +47,7 @@ param adminPassword = getSecret(
 // Existing VNet/subnet — do NOT change these unless the tplabs topology changes
 // Reason: FortiGate BGP (ASN 65421) advertises 10.250.0.0/16 to on-prem.
 // Placing the host VM here makes it reachable from Azure Local cluster automatically.
-param vnetResourceGroup = 'rg-c01-hub-eus-01'
+param vnetSubscriptionId = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
+param vnetResourceGroup = 'rg-lab-prodtech-eus-connectivity-hub'
 param vnetName          = 'vnet-lab-prodtech-eus-connectivity-hub'
 param subnetName        = 'snet-lab-prodtech-eus-connectivity-mgmt'

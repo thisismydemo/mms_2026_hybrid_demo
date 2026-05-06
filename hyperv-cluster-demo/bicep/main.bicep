@@ -30,8 +30,11 @@ param adminUsername string = 'hvlabadmin'
 @secure()
 param adminPassword string
 
+@description('Subscription containing the existing hub VNet (tplabs sub)')
+param vnetSubscriptionId string = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
+
 @description('Resource group containing the existing hub VNet')
-param vnetResourceGroup string = 'rg-c01-hub-eus-01'
+param vnetResourceGroup string = 'rg-lab-prodtech-eus-connectivity-hub'
 
 @description('Existing hub VNet name — do NOT create a new one')
 param vnetName string = 'vnet-lab-prodtech-eus-connectivity-hub'
@@ -68,7 +71,7 @@ var tags = {
 // =============================================================================
 resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' existing = {
   name: '${vnetName}/${subnetName}'
-  scope: resourceGroup(vnetResourceGroup)
+  scope: resourceGroup(vnetSubscriptionId, vnetResourceGroup)
 }
 
 // =============================================================================
