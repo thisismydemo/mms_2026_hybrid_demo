@@ -80,12 +80,12 @@ azure_platform:
 #   (192.168.211.x) and all on-prem resources — no UDR or extra routing needed.
 azure_networking:
   use_existing_vnet: true
-  vnet_name: vnet-lab-prodtech-eus-connectivity-hub
-  vnet_resource_group: rg-lab-prodtech-eus-connectivity-hub   # existing hub RG (tplabs sub 2caa0b8a-a1d6-4f0c-8c03-861787b8315c)
-  vnet_address_space: 10.250.0.0/16
+  vnet_name: vnet-azrl-dev-eus-01
+  vnet_resource_group: rg-azrlmgmt-dev-eus-01    # tplabs sub 2caa0b8a-a1d6-4f0c-8c03-861787b8315c — verified existing
+  vnet_address_space: 10.250.1.0/24
   subnet:
-    name: snet-lab-prodtech-eus-connectivity-mgmt
-    address_prefix: 10.250.1.0/24
+    name: snet-azrl-dev-eus-01
+    address_prefix: 10.250.1.32/27               # 10.250.1.32-62 — contains hvlab IPs .45/.46/.47
   existing_dns_servers:
     - 10.250.1.36    # DC1 (azrl.mgmt) — existing
     - 10.250.1.37    # DC2 (azrl.mgmt) — existing

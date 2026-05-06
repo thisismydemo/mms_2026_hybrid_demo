@@ -34,13 +34,13 @@ param adminPassword string
 param vnetSubscriptionId string = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
 
 @description('Resource group containing the existing hub VNet')
-param vnetResourceGroup string = 'rg-lab-prodtech-eus-connectivity-hub'
+param vnetResourceGroup string = 'rg-azrlmgmt-dev-eus-01'
 
-@description('Existing hub VNet name — do NOT create a new one')
-param vnetName string = 'vnet-lab-prodtech-eus-connectivity-hub'
+@description('Existing VNet name')
+param vnetName string = 'vnet-azrl-dev-eus-01'
 
-@description('Existing management subnet — BGP advertises this range to on-prem automatically')
-param subnetName string = 'snet-lab-prodtech-eus-connectivity-mgmt'
+@description('Existing management subnet — 10.250.1.32/27, contains hvlab IPs .45/.46/.47')
+param subnetName string = 'snet-azrl-dev-eus-01'
 
 // Resource name variables (CAF)
 var vmName           = 'vm-hvlab-host01-eus-01'
