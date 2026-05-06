@@ -4,7 +4,7 @@
 ##############################################################################
 
 param(
-    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2022.iso',
+    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2025.iso',
     [string]$VHDBase    = 'D:\HyperVStorage\VMs',
     [int]   $NodeCount  = 4,
     [int]   $vCPUs      = 16,
@@ -60,7 +60,7 @@ foreach ($node in $nodeConfig) {
 
 Write-Host @"
 
-All 4 cluster nodes created. Complete OS install on each, then:
+All 4 cluster nodes created (WS2025). Complete OS install on each, then:
   1. Set static IPs per node (see above)
   2. Set DNS to 172.16.10.10 (hvdc01)
   3. Join domain azrl.mgmt

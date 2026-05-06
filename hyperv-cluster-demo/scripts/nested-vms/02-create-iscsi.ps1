@@ -6,7 +6,7 @@
 
 param(
     [string]$VMName     = 'hviscsi01',
-    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2022.iso',
+    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2025.iso',
     [string]$VHDBase    = 'D:\HyperVStorage\VMs\hviscsi01',
     [int]   $vCPUs      = 4,
     [int]   $MemoryGB   = 16,
@@ -59,7 +59,7 @@ Start-VM -VM $vm
 Write-Host @"
 VM $VMName created and started.
 Post-install:
-  1. Install WS2022 from ISO
+  1. Install WS2025 from ISO
   2. NIC 1 (Storage1): $StorageIP1/24
   3. NIC 2 (Storage2): $StorageIP2/24
   4. NIC 3 (Mgmt): 172.16.10.15/24

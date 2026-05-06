@@ -120,7 +120,7 @@ host_vm:
   os:
     publisher: MicrosoftWindowsServer
     offer:     WindowsServer
-    sku:       2022-datacenter-g2
+    sku:       2025-datacenter-g2
     version:   latest
   os_disk_size_gb:   256
   os_disk_sku:       Premium_LRS
@@ -281,7 +281,7 @@ nested_vms:
     ram_gb:      8
     os_disk_gb:  80
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     vswitches:
       - vSwitch-Mgmt
     ip_mgmt:      172.16.10.10
@@ -301,7 +301,7 @@ nested_vms:
       - 500    # csv02.vhdx
       - 500    # csv03-templates.vhdx
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     # Dual-homed on Storage vSwitch to provide MPIO paths
     vswitches:
       - vSwitch-Storage
@@ -332,7 +332,7 @@ nested_vms:
     ram_gb:      64
     os_disk_gb:  80
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     vswitches:
       - vSwitch-Mgmt
       - vSwitch-Migration
@@ -353,7 +353,7 @@ nested_vms:
     ram_gb:      64
     os_disk_gb:  80
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     vswitches:
       - vSwitch-Mgmt
       - vSwitch-Migration
@@ -374,7 +374,7 @@ nested_vms:
     ram_gb:      64
     os_disk_gb:  80
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     vswitches:
       - vSwitch-Mgmt
       - vSwitch-Migration
@@ -395,7 +395,7 @@ nested_vms:
     ram_gb:      64
     os_disk_gb:  80
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     vswitches:
       - vSwitch-Mgmt
       - vSwitch-Migration
@@ -451,7 +451,7 @@ nested_vms:
     os_disk_gb:  80
     data_disk_gb: 100
     generation:  2
-    os:          WindowsServer2022
+    os:          WindowsServer2025
     vswitches:
       - vSwitch-External   # Azure-routable via secondary IP 10.250.2.7
       - vSwitch-Mgmt

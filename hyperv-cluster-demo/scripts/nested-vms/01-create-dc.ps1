@@ -6,7 +6,7 @@
 
 param(
     [string]$VMName        = 'hvdc01',
-    [string]$ISOPath       = 'D:\HyperVStorage\ISOs\WS2022.iso',
+    [string]$ISOPath       = 'D:\HyperVStorage\ISOs\WS2025.iso',
     [string]$VHDPath       = 'D:\HyperVStorage\VMs\hvdc01\hvdc01-os.vhdx',
     [int]   $VHDSizeGB     = 80,
     [int]   $vCPUs         = 2,
