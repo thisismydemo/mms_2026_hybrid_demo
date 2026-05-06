@@ -53,6 +53,15 @@ jobs:
             --tags environment=lab workload=hvlab-mms26 owner=kristopherjturner \
                    demoEvent=mms-moa-2026 createdBy=github-actions
 
+      - name: Verify cross-sub subnet access
+        run: |
+          SUBNET_ID="/subscriptions/2caa0b8a-a1d6-4f0c-8c03-861787b8315c/resourceGroups/rg-azrlmgmt-dev-eus-01/providers/Microsoft.Network/virtualNetworks/vnet-azrl-dev-eus-01/subnets/snet-azrl-dev-eus-01"
+          echo "Testing MI can read subnet in tplabs sub..."
+          az network vnet subnet show --ids "$SUBNET_ID" \
+            --subscription 2caa0b8a-a1d6-4f0c-8c03-861787b8315c \
+            --query "{name:name,prefix:addressPrefix}" -o json
+          echo "✅ Subnet read succeeded — MI has access"
+
       - name: Validate Bicep
         run: |
           az deployment group validate \
