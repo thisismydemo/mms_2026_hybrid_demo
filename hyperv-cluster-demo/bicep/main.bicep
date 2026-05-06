@@ -68,12 +68,11 @@ var tags = {
 }
 
 // =============================================================================
-// Reference existing VNet/Subnet (no new VNet — BGP routing requirement)
+// Subnet resource ID — cross-subscription reference (BGP routing requirement)
+// Using resourceId() directly avoids Bicep generating extensionResourceId()
+// which produces the wrong resource ID for child resources across subscriptions.
 // =============================================================================
-resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-09-01' existing = {
-  name: '${vnetName}/${subnetName}'
-  scope: resourceGroup(vnetSubscriptionId, vnetResourceGroup)
-}
+var subnetResourceId = resourceId(vnetSubscriptionId, vnetResourceGroup, 'Microsoft.Network/virtualNetworks/subnets', vnetName, subnetName)
 
 // =============================================================================
 // User-assigned Managed Identity
@@ -211,7 +210,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
           primary: true
           privateIPAddress: primaryIp
           privateIPAllocationMethod: 'Static'
-          subnet: { id: subnet.id }
+          subnet: { id: subnetResourceId }
           publicIPAddress: { id: pip.id }
         }
       }
@@ -221,7 +220,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
           primary: false
           privateIPAddress: wacIp
           privateIPAllocationMethod: 'Static'
-          subnet: { id: subnet.id }
+          subnet: { id: subnetResourceId }
         }
       }
       {
@@ -230,7 +229,7 @@ resource nic 'Microsoft.Network/networkInterfaces@2023-09-01' = {
           primary: false
           privateIPAddress: scvmmIp
           privateIPAllocationMethod: 'Static'
-          subnet: { id: subnet.id }
+          subnet: { id: subnetResourceId }
         }
       }
     ]
