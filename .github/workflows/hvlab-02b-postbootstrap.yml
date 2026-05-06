@@ -3,44 +3,36 @@ name: "HVLab 02b — Post-Bootstrap (ISOs + Arc)"
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   SUBSCRIPTION_ID: "00cd4357-ed45-4efb-bee0-10c467ff994b"
-  RESOURCE_GROUP:  "rg-hvlab-mms26-eus-01"
+  RESOURCE_GROUP: "rg-hvlab-mms26-eus-01"
 
 jobs:
   post-bootstrap:
     name: Post-Bootstrap (ISOs + Arc)
     runs-on: [self-hosted, hvlab-host]
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
 
-      - name: "Download evaluation ISOs (WS2022, WS2025, SQL 2022 Dev)"
+      - name: Download evaluation ISOs
         shell: pwsh
-        run: hyperv-cluster-demo/scripts/deploy/00-download-isos.ps1
+        run: '& ./hyperv-cluster-demo/scripts/deploy/00-download-isos.ps1'
         continue-on-error: true
 
-      - name: "Install Azure Arc Connected Machine Agent"
+      - name: Install Azure Arc Connected Machine Agent
         shell: pwsh
         run: |
-          hyperv-cluster-demo/scripts/deploy/07-install-arc.ps1 `
+          & ./hyperv-cluster-demo/scripts/deploy/07-install-arc.ps1 `
             -SubscriptionId "${{ env.SUBSCRIPTION_ID }}" `
-            -ResourceGroup  "${{ env.RESOURCE_GROUP }}"
+            -ResourceGroup "${{ env.RESOURCE_GROUP }}"
         continue-on-error: true
 
       - name: Summary
         shell: pwsh
         run: |
-          $summary = $env:GITHUB_STEP_SUMMARY
-          if (-not $summary) {
-            $summary = 'C:\Temp\hvlab-post-bootstrap-summary.md'
-            New-Item -ItemType Directory -Path (Split-Path $summary) -Force | Out-Null
-          }
-
-          @(
-            '## Post-Bootstrap Complete'
-            '- ISOs downloading to D:\HyperVStorage\ISOs'
-            '- Azure Arc agent install attempted'
-            '**Next step:** Run HVLab 03 - Deploy Nested VMs'
-          ) | Out-File $summary -Append
+          '## Post-Bootstrap Complete' | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          'ISOs and Arc steps completed or were allowed to continue.' | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          'Next step: HVLab 03 - Deploy Nested VMs' | Out-File $env:GITHUB_STEP_SUMMARY -Append
