@@ -30,7 +30,7 @@ param location = 'eastus'
 //   - Local NVMe ~3.8 TB (fast VHDX I/O during demo — ephemeral, copy from data disks on demo day)
 // Standard_E96ds_v5  = 96 vCPU / 672 GB (fallback if E104ids_v5 not available in region)
 // Standard_E64ds_v5  = 64 vCPU / 512 GB  (last resort — reduce cluster node vCPUs to 12 each)
-param vmSize = 'Standard_E48ds_v5'
+param vmSize = 'Standard_M32ms'
 
 param adminUsername = 'hvlabadmin'
 

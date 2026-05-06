@@ -110,12 +110,12 @@ host_vm:
   os_disk_name:        disk-hvlab-host01-os-eus-01
   managed_identity:    mi-hvlab-host01-eus-01
 
-  # VM sizing — E104ids_v5: 104 vCPU / 672 GB RAM / ISOLATED hardware
+  # VM sizing — M32ms: 32 vCPU / 875 GB RAM — fits 40 vCPU MS Family quota
   # Total nested allocation: 82 vCPU / 320 GB → 22 vCPU + 352 GB headroom
   # Isolated = dedicated physical host (no noisy neighbors — ideal for nested virtualization demos)
   # Local NVMe ~3.8 TB: copy VHDXes from data disks to NVMe on demo day for fast I/O
   # Microsoft docs explicitly recommend isolated VM sizes for nested virtualization workloads
-  size:          Standard_E104ids_v5    # preferred: isolated, 104 vCPU, local NVMe
+  size:          Standard_M32ms         # 32 vCPU / 875 GB RAM — fits MS Family quota (40)
   size_fallback: Standard_E96ds_v5     # fallback: 96 vCPU (shared hardware)
   size_last_resort: Standard_E64ds_v5  # last resort: 64 vCPU (reduce node vCPUs to 12)
 

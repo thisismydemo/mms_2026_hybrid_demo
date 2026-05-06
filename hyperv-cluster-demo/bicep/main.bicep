@@ -14,14 +14,15 @@
 @description('Azure region for all resources')
 param location string = 'eastus'
 
-@description('VM size — must support nested virtualization. E104ids_v5 = 104 vCPU / 672 GB / isolated hardware')
+@description('VM size — must support nested virtualization. M32ms = 32 vCPU / 875 GB / fits MS Family quota')
 @allowed([
-  'Standard_E48ds_v5'     // quota fit: 48 vCPU / 384 GB (sub limit is 50 vCPU)
-  'Standard_E104ids_v5'   // preferred: 104 vCPU / 672 GB / isolated / ~3.8 TB local NVMe
-  'Standard_E96ds_v5'     // fallback: 96 vCPU / 672 GB / shared hardware
-  'Standard_E64ds_v5'     // last resort: 64 vCPU / 512 GB
+  'Standard_M32ms'        // preferred: 32 vCPU / 875 GB RAM — fits 40 vCPU MS Family quota
+  'Standard_E48ds_v5'     // fallback: 48 vCPU / 384 GB — fits 50 vCPU E-series quota
+  'Standard_E104ids_v5'   // ideal if quota raised: 104 vCPU / 672 GB / isolated / local NVMe
+  'Standard_E96ds_v5'     // 96 vCPU / 672 GB
+  'Standard_E64ds_v5'     // 64 vCPU / 512 GB
 ])
-param vmSize string = 'Standard_E48ds_v5'
+param vmSize string = 'Standard_M32ms'
 
 @description('Admin username for the host VM')
 param adminUsername string = 'hvlabadmin'

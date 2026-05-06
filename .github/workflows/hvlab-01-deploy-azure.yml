@@ -10,9 +10,10 @@ on:
       vm_size:
         description: "VM size"
         required: true
-        default: "Standard_E48ds_v5"
+        default: "Standard_M32ms"
         type: choice
         options:
+          - Standard_M32ms
           - Standard_E48ds_v5
           - Standard_E104ids_v5
           - Standard_E96ds_v5
@@ -60,7 +61,7 @@ jobs:
             --template-file "$TEMPLATE_FILE" \
             --parameters "$PARAMS_FILE" \
             --parameters location="${{ github.event.inputs.location || 'eastus' }}" \
-                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E48ds_v5' }}"
+                         vmSize="${{ github.event.inputs.vm_size || 'Standard_M32ms' }}"
 
       - name: Deploy Bicep
         id: deploy
@@ -72,7 +73,7 @@ jobs:
             --template-file "$TEMPLATE_FILE" \
             --parameters "$PARAMS_FILE" \
             --parameters location="${{ github.event.inputs.location || 'eastus' }}" \
-                         vmSize="${{ github.event.inputs.vm_size || 'Standard_E48ds_v5' }}" \
+                         vmSize="${{ github.event.inputs.vm_size || 'Standard_M32ms' }}" \
             --name "hvlab-deploy-${{ github.run_number }}" \
             --output json > /tmp/deploy-output.json
 
