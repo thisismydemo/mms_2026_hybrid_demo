@@ -35,9 +35,9 @@ Copy-Item -Path $ScvmmSetupDest -Destination "D:\SCVMM2025" -ToSession $session 
 
 # Get service account passwords from Key Vault
 $sqlSvcPw   = az keyvault secret show --vault-name $KVName --subscription $KVSubscription `
-    --name 'hvlab-sqlsa-password' --query value -o tsv
+    --name 'svc-sql-scvmm-password' --query value -o tsv
 $scvmmSvcPw = az keyvault secret show --vault-name $KVName --subscription $KVSubscription `
-    --name 'hvlab-svcaccount-password' --query value -o tsv
+    --name 'svc-scvmm-svc-password' --query value -o tsv
 
 Invoke-Command -Session $session -ArgumentList $SqlISO, $DomainFqdn, $sqlSvcPw, $scvmmSvcPw -ScriptBlock {
     param($SqlISO, $DomainFqdn, $SqlSvcPw, $ScvmmSvcPw)
@@ -70,9 +70,12 @@ Invoke-Command -Session $session -ArgumentList $SqlISO, $DomainFqdn, $sqlSvcPw, 
     Write-Host "  SQL Server: $($sqlSvc.Status)"
 
     # ── SCVMM 2025 ───────────────────────────────────────────────────────────
-    Write-Host "Mounting SCVMM 2025 ISO..."
-    $scvmmDrive = Mount-DiskImage -ImagePath $ScvmmISO -PassThru | Get-Volume
-    $scvmmSetup = "$($scvmmDrive.DriveLetter):\setup.exe"
+    Write-Host "Locating SCVMM 2025 setup files (downloaded via blob batch) ..."
+    # Files were downloaded and copied to D:\SCVMM2025 — no ISO mount needed
+    $scvmmSetup = 'D:\SCVMM2025\setup.exe'
+    if (-not (Test-Path $scvmmSetup)) {
+        throw "SCVMM setup.exe not found at $scvmmSetup — verify blob download completed."
+    }
 
     # SCVMM silent install — adjust path to match your ISO layout
     $scvmmArgs = @(
@@ -91,7 +94,6 @@ Invoke-Command -Session $session -ArgumentList $SqlISO, $DomainFqdn, $sqlSvcPw, 
     )
     Write-Host "Installing SCVMM 2025..."
     Start-Process -FilePath $scvmmSetup -ArgumentList $scvmmArgs -Wait -NoNewWindow
-    Dismount-DiskImage -ImagePath $ScvmmISO
 
     # Verify SCVMM service
     $scvmmSvc = Get-Service -Name SCVMMService -ErrorAction SilentlyContinue

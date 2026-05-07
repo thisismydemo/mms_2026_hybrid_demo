@@ -1,69 +1,75 @@
 ##############################################################################
-# 03-create-cluster-nodes.ps1  — Create hvnode01 through hvnode04
-# Each node: 16 vCPU, 64 GB RAM, 5 NICs (Mgmt/Migration/Storage/Heartbeat/Workload)
+# 03-create-cluster-nodes.ps1  - Create hvnode01 through hvnode04 unattended
 ##############################################################################
 
 param(
-    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2025.iso',
-    [string]$VHDBase    = 'D:\HyperVStorage\VMs',
-    [int]   $NodeCount  = 4,
-    [int]   $vCPUs      = 16,
-    [int]   $MemoryGB   = 64,
-    [int]   $OSDiskGB   = 80
+    [string]$StorageRoot       = '',
+    [string]$ISOPath           = '',
+    [string]$BootstrapPassword = '',
+    [int]$NodeCount            = 4,
+    [int]$vCPUs                = 16,
+    [int]$MemoryGB             = 64,
+    [int]$OSDiskGB             = 80,
+    [string]$MgmtDnsServer     = '172.16.10.10',
+    [string]$DomainFqdn        = 'azrl.mgmt',
+    [string]$DomainJoinUser    = 'Administrator',
+    [string]$KVName            = 'kv-tplabs-platform',
+    [string]$KVSubscription    = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
 )
 
 $ErrorActionPreference = 'Stop'
+$modulePath = Join-Path $PSScriptRoot '..\common\HVLab.Automation.psm1'
+Import-Module $modulePath -Force
 
+$storageRoot = Get-HVLabStorageRoot -PreferredRoot $StorageRoot
+if (-not $ISOPath) {
+    $ISOPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath 'ISOs\WS2025.iso'
+}
+
+$bootstrapCredential = New-HVLabBootstrapCredential -SecretValue $BootstrapPassword -VaultName $KVName -SubscriptionId $KVSubscription
 $nodeConfig = @(
-    @{ Name='hvnode01'; MgmtIP='172.16.10.21'; MigIP='172.16.20.21'; StorIP='172.16.30.21'; HbIP='172.16.40.21' },
-    @{ Name='hvnode02'; MgmtIP='172.16.10.22'; MigIP='172.16.20.22'; StorIP='172.16.30.22'; HbIP='172.16.40.22' },
-    @{ Name='hvnode03'; MgmtIP='172.16.10.23'; MigIP='172.16.20.23'; StorIP='172.16.30.23'; HbIP='172.16.40.23' },
-    @{ Name='hvnode04'; MgmtIP='172.16.10.24'; MigIP='172.16.20.24'; StorIP='172.16.30.24'; HbIP='172.16.40.24' }
-)
+    @{ Name = 'hvnode01'; MgmtIP = '172.16.10.21'; MigIP = '172.16.20.21'; StorIP1 = '172.16.30.21'; StorIP2 = '172.16.30.25'; HbIP = '172.16.40.21' },
+    @{ Name = 'hvnode02'; MgmtIP = '172.16.10.22'; MigIP = '172.16.20.22'; StorIP1 = '172.16.30.22'; StorIP2 = '172.16.30.26'; HbIP = '172.16.40.22' },
+    @{ Name = 'hvnode03'; MgmtIP = '172.16.10.23'; MigIP = '172.16.20.23'; StorIP1 = '172.16.30.23'; StorIP2 = '172.16.30.27'; HbIP = '172.16.40.23' },
+    @{ Name = 'hvnode04'; MgmtIP = '172.16.10.24'; MigIP = '172.16.20.24'; StorIP1 = '172.16.30.24'; StorIP2 = '172.16.30.28'; HbIP = '172.16.40.24' }
+) | Select-Object -First $NodeCount
 
 foreach ($node in $nodeConfig) {
     Write-Host "=== Creating $($node.Name) ===" -ForegroundColor Cyan
 
-    $vmDir  = Join-Path $VHDBase $node.Name
-    $osDisk = Join-Path $vmDir "$($node.Name)-os.vhdx"
-    New-Item -ItemType Directory -Path $vmDir -Force | Out-Null
-    New-VHD -Path $osDisk -SizeBytes ($OSDiskGB * 1GB) -Dynamic | Out-Null
+    $vmPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath "VMs\$($node.Name)"
+    $osDisk = Join-Path $vmPath "$($node.Name)-os.vhdx"
 
-    $vm = New-VM -Name $node.Name `
-        -Generation 2 `
-        -MemoryStartupBytes ($MemoryGB * 1GB) `
-        -VHDPath $osDisk `
-        -SwitchName 'vSwitch-Mgmt'
+    New-HVLabWindowsVhd -IsoPath $ISOPath -VhdPath $osDisk -SizeGB $OSDiskGB -ComputerName $node.Name -AdminPassword ($bootstrapCredential.GetNetworkCredential().Password) | Out-Null
 
-    Set-VMProcessor -VM $vm -Count $vCPUs -ExposeVirtualizationExtensions $true
-    Set-VMMemory    -VM $vm -DynamicMemoryEnabled $false
-    Set-VMFirmware  -VM $vm -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
+    New-HVLabVm -Name $node.Name -OSVhdPath $osDisk -VmPath $vmPath -MemoryGB $MemoryGB -ProcessorCount $vCPUs -ExposeVirtualizationExtensions -AdapterDefinitions @(
+        @{ Name = 'Mgmt'; SwitchName = 'vSwitch-Mgmt' },
+        @{ Name = 'Migration'; SwitchName = 'vSwitch-Migration' },
+        @{ Name = 'Storage1'; SwitchName = 'vSwitch-Storage' },
+        @{ Name = 'Storage2'; SwitchName = 'vSwitch-Storage' },
+        @{ Name = 'Heartbeat'; SwitchName = 'vSwitch-Heartbeat' },
+        @{ Name = 'Workload'; SwitchName = 'vSwitch-Workload'; EnableMacAddressSpoofing = $true }
+    ) | Out-Null
 
-    # Additional NICs
-    Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Migration' -Name 'Migration'
-    Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Storage'   -Name 'Storage'
-    Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Heartbeat' -Name 'Heartbeat'
-    Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Workload'  -Name 'Workload'
+    Initialize-HVLabGuestNetwork -VMName $node.Name -Credential $bootstrapCredential -AdapterConfigurations @(
+        @{ Name = 'Mgmt'; GuestName = 'Mgmt'; IPAddress = $node.MgmtIP; PrefixLength = 24; Gateway = '172.16.10.1'; DnsServers = @($MgmtDnsServer) },
+        @{ Name = 'Migration'; GuestName = 'Migration'; IPAddress = $node.MigIP; PrefixLength = 24; Gateway = ''; DnsServers = @() },
+        @{ Name = 'Storage1'; GuestName = 'Storage1'; IPAddress = $node.StorIP1; PrefixLength = 24; Gateway = ''; DnsServers = @() },
+        @{ Name = 'Storage2'; GuestName = 'Storage2'; IPAddress = $node.StorIP2; PrefixLength = 24; Gateway = ''; DnsServers = @() },
+        @{ Name = 'Heartbeat'; GuestName = 'Heartbeat'; IPAddress = $node.HbIP; PrefixLength = 24; Gateway = ''; DnsServers = @() },
+        @{ Name = 'Workload'; GuestName = 'Workload'; IPAddress = ''; PrefixLength = 0; Gateway = ''; DnsServers = @() }
+    )
 
-    # Boot from ISO
-    $dvd = Add-VMDvdDrive -VM $vm -Path $ISOPath -PassThru
-    Set-VMFirmware -VM $vm -BootOrder $dvd, (Get-VMHardDiskDrive -VM $vm | Select-Object -First 1)
+    $domainCredential = New-Object System.Management.Automation.PSCredential(
+        "$DomainJoinUser@$DomainFqdn",
+        $bootstrapCredential.Password
+    )
 
-    # Enable MAC spoofing on Workload NIC (needed for nested VM traffic on Workload vSwitch)
-    Get-VMNetworkAdapter -VM $vm -Name 'Workload' | Set-VMNetworkAdapter -MacAddressSpoofing On
+    Join-HVLabGuestToDomain -VMName $node.Name -LocalCredential $bootstrapCredential -DomainFqdn $DomainFqdn -DomainCredential $domainCredential -DnsServers @($MgmtDnsServer)
 
-    Start-VM -VM $vm
-    Write-Host "  ✅ $($node.Name) created and started"
-    Write-Host "     Mgmt: $($node.MgmtIP)/24  Migration: $($node.MigIP)/24"
-    Write-Host "     Storage: $($node.StorIP)/24  Heartbeat: $($node.HbIP)/24"
+    Write-Host "  Mgmt: $($node.MgmtIP)/24  Migration: $($node.MigIP)/24"
+    Write-Host "  Storage1: $($node.StorIP1)/24  Storage2: $($node.StorIP2)/24  Heartbeat: $($node.HbIP)/24"
 }
 
-Write-Host @"
-
-All 4 cluster nodes created (WS2025). Complete OS install on each, then:
-  1. Set static IPs per node (see above)
-  2. Set DNS to 172.16.10.10 (hvdc01)
-  3. Join domain azrl.mgmt
-  4. Run configure/01-configure-iscsi-initiators.ps1 (MPIO + iSCSI)
-  5. Run configure/03-configure-cluster.ps1
-"@
+Write-Host "All cluster nodes are imaged, baseline networked, and joined to $DomainFqdn."
+Write-Host "Run configure/02-configure-iscsi-initiators.ps1 and configure/03-configure-cluster.ps1 next."

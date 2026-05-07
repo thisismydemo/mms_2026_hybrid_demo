@@ -31,8 +31,39 @@ permissions:
   contents: read
 
 jobs:
+  preflight:
+    name: Validate repo before deployment
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+            Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          }
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.SUBSCRIPTION_ID }}
+
+      - name: Run preflight validation
+        shell: pwsh
+        run: |
+          hyperv-cluster-demo/scripts/validate/Invoke-HVLabPreflight.ps1 `
+            -SubscriptionId "${{ env.SUBSCRIPTION_ID }}" `
+            -ResourceGroup "${{ env.RESOURCE_GROUP }}" `
+            -Location "${{ github.event.inputs.location || 'eastus' }}" `
+            -VmSize "${{ github.event.inputs.vm_size || 'Standard_M32ms' }}"
+
   deploy:
     name: Deploy Bicep
+    needs: preflight
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

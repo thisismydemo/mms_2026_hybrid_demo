@@ -66,9 +66,16 @@ $i = 0
 foreach ($disk in $clusterDisks) {
     if ($i -ge $csvNames.Count) { break }
     Add-ClusterSharedVolume -InputObject $disk
-    $csv = Get-ClusterSharedVolume -Cluster $ClusterName | Where-Object { $_.Name -like "*$($disk.Name)*" }
+    # Rename the CSV volume folder (the only supported way to label CSVs)
+    $csv = Get-ClusterSharedVolume -Cluster $ClusterName |
+        Where-Object { $_.SharedVolumeInfo.FriendlyVolumeName -match "Volume$($i+1)" } |
+        Select-Object -First 1
     if ($csv) {
-        $csv | Set-ClusterParameter -Name FriendlyName -Value $csvNames[$i]
+        $mountPath = $csv.SharedVolumeInfo.FriendlyVolumeName
+        $newPath   = "C:\ClusterStorage\$($csvNames[$i])"
+        if ((Test-Path $mountPath) -and $mountPath -ne $newPath) {
+            Rename-Item -Path $mountPath -NewName $csvNames[$i] -ErrorAction SilentlyContinue
+        }
     }
     Write-Host "  ✅ $($csvNames[$i]) added as CSV"
     $i++

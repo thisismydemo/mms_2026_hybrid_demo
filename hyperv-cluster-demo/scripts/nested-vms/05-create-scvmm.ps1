@@ -1,63 +1,66 @@
 ##############################################################################
-# 05-create-scvmm.ps1  — Create hvscvmm01 (SCVMM 2025 + SQL Server Developer)
-# SQL Server Developer Edition is FREE for dev/test workloads.
+# 05-create-scvmm.ps1  - Create hvscvmm01 unattended on WS2025
 ##############################################################################
 
 param(
-    [string]$VMName     = 'hvscvmm01',
-    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2022.iso',
-    [string]$VHDBase    = 'D:\HyperVStorage\VMs\hvscvmm01',
-    [int]   $vCPUs      = 8,
-    [int]   $MemoryGB   = 32,
-    [int]   $OSDiskGB   = 80,
-    [int]   $DataDiskGB = 100,   # SCVMM library + SQL data
-    [string]$MgmtIP     = '172.16.10.40',
-    [string]$ExternalIP = '10.250.2.7'
+    [string]$VMName            = 'hvscvmm01',
+    [string]$StorageRoot       = '',
+    [string]$ISOPath           = '',
+    [string]$BootstrapPassword = '',
+    [int]$vCPUs                = 8,
+    [int]$MemoryGB             = 32,
+    [int]$OSDiskGB             = 80,
+    [int]$DataDiskGB           = 100,
+    [string]$MgmtIP            = '172.16.10.40',
+    [int]$MgmtPrefixLen        = 24,
+    [string]$ExternalIP        = '10.250.2.7',
+    [int]$ExternalPrefixLen    = 27,
+    [string]$ExternalGateway   = '10.250.2.1',
+    [string]$MgmtDnsServer     = '172.16.10.10',
+    [string]$DomainFqdn        = 'azrl.mgmt',
+    [string]$DomainJoinUser    = 'Administrator',
+    [string]$KVName            = 'kv-tplabs-platform',
+    [string]$KVSubscription    = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
 )
 
 $ErrorActionPreference = 'Stop'
+$modulePath = Join-Path $PSScriptRoot '..\common\HVLab.Automation.psm1'
+Import-Module $modulePath -Force
+
+$storageRoot = Get-HVLabStorageRoot -PreferredRoot $StorageRoot
+if (-not $ISOPath) {
+    $ISOPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath 'ISOs\WS2025.iso'
+}
+
+$vmPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath "VMs\$VMName"
+$osDisk = Join-Path $vmPath "$VMName-os.vhdx"
+$dataDisk = Join-Path $vmPath "$VMName-data.vhdx"
+if (-not (Test-Path $dataDisk)) {
+    New-VHD -Path $dataDisk -SizeBytes ($DataDiskGB * 1GB) -Dynamic | Out-Null
+}
+
+$bootstrapCredential = New-HVLabBootstrapCredential -SecretValue $BootstrapPassword -VaultName $KVName -SubscriptionId $KVSubscription
+
 Write-Host "=== Creating $VMName (SCVMM 2025 + SQL Developer) ===" -ForegroundColor Cyan
 
-New-Item -ItemType Directory -Path $VHDBase -Force | Out-Null
+New-HVLabWindowsVhd -IsoPath $ISOPath -VhdPath $osDisk -SizeGB $OSDiskGB -ComputerName $VMName -AdminPassword ($bootstrapCredential.GetNetworkCredential().Password) | Out-Null
 
-$osDisk   = Join-Path $VHDBase 'hvscvmm01-os.vhdx'
-$dataDisk = Join-Path $VHDBase 'hvscvmm01-data.vhdx'
-New-VHD -Path $osDisk   -SizeBytes ($OSDiskGB   * 1GB) -Dynamic | Out-Null
-New-VHD -Path $dataDisk -SizeBytes ($DataDiskGB * 1GB) -Dynamic | Out-Null
+New-HVLabVm -Name $VMName -OSVhdPath $osDisk -VmPath $vmPath -MemoryGB $MemoryGB -ProcessorCount $vCPUs -AdapterDefinitions @(
+    @{ Name = 'External'; SwitchName = 'vSwitch-External' },
+    @{ Name = 'Mgmt'; SwitchName = 'vSwitch-Mgmt' }
+) -DataVhdPaths @($dataDisk) | Out-Null
 
-$vm = New-VM -Name $VMName `
-    -Generation 2 `
-    -MemoryStartupBytes ($MemoryGB * 1GB) `
-    -VHDPath $osDisk `
-    -SwitchName 'vSwitch-External'   # Primary NIC → 10.250.2.7
+Initialize-HVLabGuestNetwork -VMName $VMName -Credential $bootstrapCredential -AdapterConfigurations @(
+    @{ Name = 'External'; GuestName = 'External'; IPAddress = $ExternalIP; PrefixLength = $ExternalPrefixLen; Gateway = $ExternalGateway; DnsServers = @($MgmtDnsServer) },
+    @{ Name = 'Mgmt'; GuestName = 'Mgmt'; IPAddress = $MgmtIP; PrefixLength = $MgmtPrefixLen; Gateway = ''; DnsServers = @($MgmtDnsServer) }
+)
 
-Set-VMProcessor -VM $vm -Count $vCPUs
-Set-VMMemory    -VM $vm -DynamicMemoryEnabled $false
-Set-VMFirmware  -VM $vm -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
+$domainCredential = New-Object System.Management.Automation.PSCredential(
+    "$DomainJoinUser@$DomainFqdn",
+    $bootstrapCredential.Password
+)
 
-Add-VMHardDiskDrive -VM $vm -Path $dataDisk
-Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Mgmt' -Name 'Mgmt'
+Join-HVLabGuestToDomain -VMName $VMName -LocalCredential $bootstrapCredential -DomainFqdn $DomainFqdn -DomainCredential $domainCredential -DnsServers @($MgmtDnsServer)
 
-$dvd = Add-VMDvdDrive -VM $vm -Path $ISOPath -PassThru
-Set-VMFirmware -VM $vm -BootOrder $dvd, (Get-VMHardDiskDrive -VM $vm | Select-Object -First 1)
-
-Start-VM -VM $vm
-
-Write-Host @"
-✅ $VMName created and started.
-
-Post-install:
-  1. Install WS2022 from ISO
-  2. External NIC: $ExternalIP/27, gateway 10.250.2.1, DNS 172.16.10.10 (hvdc01)
-  3. Mgmt NIC: $MgmtIP/24
-  4. Initialize D:\ drive (data disk) for SCVMM library + SQL data files
-  5. Join domain azrl.mgmt
-  6. Create service accounts in AD (run configure/05-configure-ad.ps1 first)
-  7. Run configure/06-configure-scvmm.ps1 to:
-     - Install SQL Server Developer (free for dev/test)
-     - Install SCVMM 2025 management server
-     - Add Hyper-V hosts and cluster hvlab-clus01
-     - Configure logical networks and library
-
-SCVMM console: RDP to $ExternalIP, open VMM console
-"@
+Write-Host "hvscvmm01 is imaged, booted, and joined to $DomainFqdn."
+Write-Host "Run configure/06-configure-scvmm.ps1 next."

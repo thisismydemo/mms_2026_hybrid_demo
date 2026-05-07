@@ -1,50 +1,97 @@
 ##############################################################################
-# 01-create-dc.ps1  — Create hvdc01 (forest root DC for azrl.mgmt)
-# Runs on: self-hosted runner (hvlab-host) inside vm-hvlab-host01-eus-01
-# Note: Isolated VNet — standalone new forest, no replication from external DCs.
+# 01-create-dc.ps1  - Create hvdc01 and promote it as the forest root DC
+# Runs on: self-hosted runner on the Hyper-V host
 ##############################################################################
 
 param(
-    [string]$VMName        = 'hvdc01',
-    [string]$ISOPath       = 'D:\HyperVStorage\ISOs\WS2025.iso',
-    [string]$VHDPath       = 'D:\HyperVStorage\VMs\hvdc01\hvdc01-os.vhdx',
-    [int]   $VHDSizeGB     = 80,
-    [int]   $vCPUs         = 2,
-    [int]   $MemoryGB      = 8,
-    [string]$MgmtIP        = '172.16.10.10',
-    [string]$MgmtPrefixLen = '24',
-    [string]$MgmtGateway   = '172.16.10.1',
-    [string]$DomainFqdn    = 'azrl.mgmt'
+    [string]$VMName            = 'hvdc01',
+    [string]$StorageRoot       = '',
+    [string]$ISOPath           = '',
+    [string]$BootstrapPassword = '',
+    [int]$VHDSizeGB            = 80,
+    [int]$vCPUs                = 2,
+    [int]$MemoryGB             = 8,
+    [string]$MgmtIP            = '172.16.10.10',
+    [int]$MgmtPrefixLen        = 24,
+    [string]$MgmtGateway       = '172.16.10.1',
+    [string]$DomainFqdn        = 'azrl.mgmt',
+    [string]$DomainNetBIOS     = 'AZRL',
+    [string]$KVName            = 'kv-tplabs-platform',
+    [string]$KVSubscription    = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
 )
 
 $ErrorActionPreference = 'Stop'
-Write-Host "=== Creating $VMName ===" -ForegroundColor Cyan
+$modulePath = Join-Path $PSScriptRoot '..\common\HVLab.Automation.psm1'
+Import-Module $modulePath -Force
 
-New-Item -ItemType Directory -Path (Split-Path $VHDPath) -Force | Out-Null
-New-VHD -Path $VHDPath -SizeBytes ($VHDSizeGB * 1GB) -Dynamic | Out-Null
+$storageRoot = Get-HVLabStorageRoot -PreferredRoot $StorageRoot
+if (-not $ISOPath) {
+    $ISOPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath 'ISOs\WS2025.iso'
+}
 
-$vm = New-VM -Name $VMName `
-    -Generation 2 `
-    -MemoryStartupBytes ($MemoryGB * 1GB) `
-    -VHDPath $VHDPath `
-    -SwitchName 'vSwitch-Mgmt'
+$vmPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath "VMs\$VMName"
+$vhdPath = Join-Path $vmPath "$VMName-os.vhdx"
+$bootstrapCredential = New-HVLabBootstrapCredential -SecretValue $BootstrapPassword -VaultName $KVName -SubscriptionId $KVSubscription
+$hostDnsServers = Get-HVLabHostDnsServers
 
-Set-VMProcessor -VM $vm -Count $vCPUs
-Set-VMMemory -VM $vm -DynamicMemoryEnabled $false
-Set-VMFirmware -VM $vm -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
+Write-Host "=== Creating $VMName as a replica-DC candidate ===" -ForegroundColor Cyan
+Write-Host "Storage root: $storageRoot"
+Write-Host "Bootstrap DNS: $($hostDnsServers -join ', ')"
 
-# Boot from ISO
-$dvd = Add-VMDvdDrive -VM $vm -Path $ISOPath -PassThru
-Set-VMFirmware -VM $vm -BootOrder $dvd, (Get-VMHardDiskDrive -VM $vm)
+New-HVLabWindowsVhd -IsoPath $ISOPath -VhdPath $vhdPath -SizeGB $VHDSizeGB -ComputerName $VMName -AdminPassword ($bootstrapCredential.GetNetworkCredential().Password) | Out-Null
 
-Write-Host "VM $VMName created. Start VM and complete OS install, then run configure/05-configure-ad.ps1"
-Write-Host "Post-install steps:"
-Write-Host "  1. Install OS from ISO"
-Write-Host "  2. Set static IP $MgmtIP/$MgmtPrefixLen on Mgmt NIC, gateway $MgmtGateway"
-Write-Host "  3. Set DNS to 127.0.0.1 (self — will be authoritative for $DomainFqdn)"
-Write-Host "  4. Install AD DS role: Install-WindowsFeature AD-Domain-Services -IncludeManagementTools"
-Write-Host "  5. Promote as forest root: Install-ADDSForest -DomainName $DomainFqdn -InstallDns"
-Write-Host "  6. Run configure/05-configure-ad.ps1 to create OUs, service accounts, security groups"
+New-HVLabVm -Name $VMName -OSVhdPath $vhdPath -VmPath $vmPath -MemoryGB $MemoryGB -ProcessorCount $vCPUs -AdapterDefinitions @(
+    @{ Name = 'Mgmt'; SwitchName = 'vSwitch-Mgmt' }
+) | Out-Null
 
-Start-VM -VM $vm
-Write-Host "VM started. Connect via Hyper-V console to complete OS setup."
+Initialize-HVLabGuestNetwork -VMName $VMName -Credential $bootstrapCredential -AdapterConfigurations @(
+    @{
+        Name         = 'Mgmt'
+        GuestName    = 'Mgmt'
+        IPAddress    = $MgmtIP
+        PrefixLength = $MgmtPrefixLen
+        Gateway      = $MgmtGateway
+        DnsServers   = $hostDnsServers
+    }
+)
+
+Invoke-HVLabPowerShellDirect -VMName $VMName -Credential $bootstrapCredential -ArgumentList $DomainFqdn, $DomainNetBIOS, $MgmtIP, ($bootstrapCredential.GetNetworkCredential().Password) -ScriptBlock {
+    param($DomainFqdn, $DomainNetBIOS, $MgmtIP, $BootstrapPassword)
+
+    $alreadyDc = $false
+    try {
+        Get-Service -Name NTDS -ErrorAction Stop | Out-Null
+        $alreadyDc = $true
+    } catch {
+    }
+
+    if (-not $alreadyDc) {
+        Install-WindowsFeature AD-Domain-Services, DNS -IncludeManagementTools | Out-Null
+        $safeModePassword = ConvertTo-SecureString $BootstrapPassword -AsPlainText -Force
+        Install-ADDSForest \
+            -DomainName $DomainFqdn \
+            -DomainNetbiosName $DomainNetBIOS \
+            -InstallDNS \
+            -SafeModeAdministratorPassword $safeModePassword \
+            -NoRebootOnCompletion:$true \
+            -Force:$true
+    }
+
+    $primaryAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Sort-Object InterfaceIndex | Select-Object -First 1
+    if ($primaryAdapter) {
+        Set-DnsClientServerAddress -InterfaceAlias $primaryAdapter.Name -ServerAddresses @($MgmtIP) -ErrorAction SilentlyContinue
+    }
+} | Out-Null
+
+Restart-HVLabGuest -VMName $VMName -Credential $bootstrapCredential -DelaySeconds 15 -TimeoutMinutes 30
+
+Invoke-HVLabPowerShellDirect -VMName $VMName -Credential $bootstrapCredential -ArgumentList $MgmtIP -ScriptBlock {
+    param($MgmtIP)
+    $primaryAdapter = Get-NetAdapter | Where-Object { $_.Status -eq 'Up' } | Sort-Object InterfaceIndex | Select-Object -First 1
+    if ($primaryAdapter) {
+        Set-DnsClientServerAddress -InterfaceAlias $primaryAdapter.Name -ServerAddresses @($MgmtIP) -ErrorAction SilentlyContinue
+    }
+} | Out-Null
+
+Write-Host "hvdc01 is imaged, promoted, and running as the forest root DC for $DomainFqdn."
+Write-Host "Run configure/05-configure-ad.ps1 next to create OUs, service accounts, groups, and DNS settings."

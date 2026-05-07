@@ -14,6 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: "Configure Active Directory objects (OUs, service accounts, groups, DNS forwarder)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/05-configure-ad.ps1
+
       - name: "Configure iSCSI target and LUNs on hviscsi01"
         shell: pwsh
         run: hyperv-cluster-demo/scripts/configure/01-configure-iscsi.ps1
@@ -22,21 +26,17 @@ jobs:
         shell: pwsh
         run: hyperv-cluster-demo/scripts/configure/02-configure-iscsi-initiators.ps1
 
+      - name: "Configure Network ATC intents on cluster nodes (SET switch)"
+        shell: pwsh
+        run: hyperv-cluster-demo/scripts/configure/08-configure-network-atc.ps1
+
       - name: "Create and configure failover cluster (hvlab-clus01)"
         shell: pwsh
         run: hyperv-cluster-demo/scripts/configure/03-configure-cluster.ps1
 
-      - name: "Configure Active Directory objects (OUs, service accounts, groups, DNS forwarder)"
-        shell: pwsh
-        run: hyperv-cluster-demo/scripts/configure/05-configure-ad.ps1
-
       - name: "Configure DHCP scopes on hvdc01 (Mgmt + Workload)"
         shell: pwsh
         run: hyperv-cluster-demo/scripts/configure/07-configure-dhcp.ps1
-
-      - name: "Configure Network ATC intents on cluster nodes (SET switch)"
-        shell: pwsh
-        run: hyperv-cluster-demo/scripts/configure/08-configure-network-atc.ps1
 
       - name: Summary
         shell: pwsh

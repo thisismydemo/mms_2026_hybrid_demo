@@ -60,20 +60,8 @@ jobs:
             --timeout 300
           echo "VM is back online."
 
-      # ── Get secrets from Key Vault ──────────────────────────────────────────
-      - name: "Get domain join password from Key Vault"
-        id: kv-secrets
-        run: |
-          DOMAIN_PW=$(az keyvault secret show \
-            --vault-name "$KV_NAME" \
-            --subscription "$KV_SUBSCRIPTION" \
-            --name "svc-hvlab-deploy-password" \
-            --query value -o tsv)
-          echo "::add-mask::$DOMAIN_PW"
-          echo "domain_pw=$DOMAIN_PW" >> $GITHUB_OUTPUT
-
       # ── Phase 2: Configure Hyper-V ─────────────────────────────────────────
-      - name: "Phase 2 — Configure Hyper-V, vSwitches, WinNAT, domain join"
+      - name: "Phase 2 — Configure Hyper-V, vSwitches, and WinNAT"
         run: |
           az vm run-command invoke \
             --subscription "$SUBSCRIPTION_ID" \
@@ -81,11 +69,10 @@ jobs:
             --name "$VM_NAME" \
             --command-id RunPowerShellScript \
             --scripts @hyperv-cluster-demo/scripts/deploy/05-bootstrap-phase2.ps1 \
-            --parameters "DomainJoinPassword=${{ steps.kv-secrets.outputs.domain_pw }}" \
             --output json
           echo "Phase 2 complete."
 
-      - name: "Wait for domain join reboot"
+      - name: "Wait for host services to settle"
         run: sleep 120
 
       # ── Get GitHub runner token via KV PAT (GITHUB_TOKEN lacks runner scope) ──
@@ -124,7 +111,8 @@ jobs:
       - name: Summary
         run: |
           echo "## ✅ Host VM Bootstrap Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- Windows features, storage pool, vSwitches, WinNAT, domain join done" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows features, storage pool, vSwitches, and WinNAT done" >> $GITHUB_STEP_SUMMARY
+          echo "- Host domain join intentionally deferred until the lab-local domain exists" >> $GITHUB_STEP_SUMMARY
           echo "- Self-hosted runner **hvlab-host** installed and running" >> $GITHUB_STEP_SUMMARY
           echo "**Next step:** Run **HVLab 02b — Post-Bootstrap (ISOs + Arc)**" >> $GITHUB_STEP_SUMMARY
 

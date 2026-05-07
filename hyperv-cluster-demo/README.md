@@ -78,6 +78,7 @@ Before running any workflow, complete **all** steps in [`docs/02-prerequisites.m
 | [11-bgp-routing-connectivity.md](docs/11-bgp-routing-connectivity.md) | BGP deep dive, secondary IP forwarding |
 | [12-deployment-workflow.md](docs/12-deployment-workflow.md) | Step-by-step deployment with troubleshooting |
 | [13-demo-day-guide.md](docs/13-demo-day-guide.md) | Demo day checklist and session walkthroughs |
+| [14-platform-roadmap.md](docs/14-platform-roadmap.md) | Roadmap for growing the demo into a repeatable lab platform |
 
 ---
 

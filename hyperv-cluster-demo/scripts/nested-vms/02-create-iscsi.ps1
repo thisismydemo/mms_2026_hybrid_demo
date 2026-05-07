@@ -1,68 +1,74 @@
 ##############################################################################
-# 02-create-iscsi.ps1  — Create hviscsi01 (iSCSI Target Server)
-# Windows Server iSCSI Target Server role is FREE and built-in — no SAN needed.
-# Dual-homed on Storage vSwitch for MPIO (two paths per cluster node).
+# 02-create-iscsi.ps1  - Create hviscsi01 with an unattended OS baseline
 ##############################################################################
 
 param(
-    [string]$VMName     = 'hviscsi01',
-    [string]$ISOPath    = 'D:\HyperVStorage\ISOs\WS2025.iso',
-    [string]$VHDBase    = 'D:\HyperVStorage\VMs\hviscsi01',
-    [int]   $vCPUs      = 4,
-    [int]   $MemoryGB   = 16,
-    [int]   $OSDiskGB   = 80,
-    # Data VHDs for iSCSI LUNs
-    [int[]] $DataDiskGB = @(2, 500, 500, 500),   # quorum, csv01, csv02, csv03-templates
-    [string]$StorageIP1 = '172.16.30.10',
-    [string]$StorageIP2 = '172.16.30.11'
+    [string]$VMName            = 'hviscsi01',
+    [string]$StorageRoot       = '',
+    [string]$ISOPath           = '',
+    [string]$BootstrapPassword = '',
+    [int]$vCPUs                = 4,
+    [int]$MemoryGB             = 16,
+    [int]$OSDiskGB             = 80,
+    [int[]]$DataDiskGB         = @(2, 500, 500, 500),
+    [string]$StorageIP1        = '172.16.30.10',
+    [string]$StorageIP2        = '172.16.30.11',
+    [string]$MgmtIP            = '172.16.10.15',
+    [int]$MgmtPrefixLen        = 24,
+    [string]$MgmtGateway       = '172.16.10.1',
+    [string]$MgmtDnsServer     = '172.16.10.10',
+    [string]$DomainFqdn        = 'azrl.mgmt',
+    [string]$DomainJoinUser    = 'Administrator',
+    [string]$KVName            = 'kv-tplabs-platform',
+    [string]$KVSubscription    = '2caa0b8a-a1d6-4f0c-8c03-861787b8315c'
 )
 
 $ErrorActionPreference = 'Stop'
-Write-Host "=== Creating $VMName ===" -ForegroundColor Cyan
+$modulePath = Join-Path $PSScriptRoot '..\common\HVLab.Automation.psm1'
+Import-Module $modulePath -Force
 
-New-Item -ItemType Directory -Path $VHDBase -Force | Out-Null
-
-# OS disk
-$osDisk = Join-Path $VHDBase 'hviscsi01-os.vhdx'
-New-VHD -Path $osDisk -SizeBytes ($OSDiskGB * 1GB) -Dynamic | Out-Null
-
-$vm = New-VM -Name $VMName `
-    -Generation 2 `
-    -MemoryStartupBytes ($MemoryGB * 1GB) `
-    -VHDPath $osDisk `
-    -SwitchName 'vSwitch-Storage'
-
-Set-VMProcessor -VM $vm -Count $vCPUs
-Set-VMMemory -VM $vm -DynamicMemoryEnabled $false
-Set-VMFirmware -VM $vm -EnableSecureBoot On -SecureBootTemplate MicrosoftWindows
-
-# Second Storage NIC for MPIO path 2
-Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Storage' -Name 'Storage2'
-# Also add Mgmt NIC for management access
-Add-VMNetworkAdapter -VM $vm -SwitchName 'vSwitch-Mgmt' -Name 'Mgmt'
-
-# Data VHDs for iSCSI LUNs
-$lunNames = @('quorum','csv01','csv02','csv03-templates')
-for ($i = 0; $i -lt $DataDiskGB.Count; $i++) {
-    $vhdPath = Join-Path $VHDBase "hviscsi01-lun$i-$($lunNames[$i]).vhdx"
-    New-VHD -Path $vhdPath -SizeBytes ($DataDiskGB[$i] * 1GB) -Dynamic | Out-Null
-    Add-VMHardDiskDrive -VM $vm -Path $vhdPath
-    Write-Host "  LUN $i ($($lunNames[$i])): $($DataDiskGB[$i]) GB — $vhdPath"
+$storageRoot = Get-HVLabStorageRoot -PreferredRoot $StorageRoot
+if (-not $ISOPath) {
+    $ISOPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath 'ISOs\WS2025.iso'
 }
 
-# Boot from ISO
-$dvd = Add-VMDvdDrive -VM $vm -Path $ISOPath -PassThru
-Set-VMFirmware -VM $vm -BootOrder $dvd, (Get-VMHardDiskDrive -VM $vm | Select-Object -First 1)
+$vmPath = Resolve-HVLabStoragePath -StorageRoot $storageRoot -ChildPath "VMs\$VMName"
+$osDisk = Join-Path $vmPath "$VMName-os.vhdx"
+$bootstrapCredential = New-HVLabBootstrapCredential -SecretValue $BootstrapPassword -VaultName $KVName -SubscriptionId $KVSubscription
 
-Start-VM -VM $vm
+$lunNames = @('quorum', 'csv01', 'csv02', 'csv03-templates')
+$dataVhdPaths = @()
+for ($i = 0; $i -lt $DataDiskGB.Count; $i++) {
+    $dataVhdPath = Join-Path $vmPath ("{0}-data{1}-{2}.vhdx" -f $VMName, ($i + 1), $lunNames[$i])
+    if (-not (Test-Path $dataVhdPath)) {
+        New-VHD -Path $dataVhdPath -SizeBytes ($DataDiskGB[$i] * 1GB) -Dynamic | Out-Null
+    }
+    $dataVhdPaths += $dataVhdPath
+}
 
-Write-Host @"
-VM $VMName created and started.
-Post-install:
-  1. Install WS2025 from ISO
-  2. NIC 1 (Storage1): $StorageIP1/24
-  3. NIC 2 (Storage2): $StorageIP2/24
-  4. NIC 3 (Mgmt): 172.16.10.15/24
-  5. Join domain azrl.mgmt
-  6. Run configure/01-configure-iscsi.ps1 to install iSCSI Target role + create LUNs
-"@
+Write-Host "=== Creating $VMName ===" -ForegroundColor Cyan
+Write-Host "Storage root: $storageRoot"
+
+New-HVLabWindowsVhd -IsoPath $ISOPath -VhdPath $osDisk -SizeGB $OSDiskGB -ComputerName $VMName -AdminPassword ($bootstrapCredential.GetNetworkCredential().Password) | Out-Null
+
+New-HVLabVm -Name $VMName -OSVhdPath $osDisk -VmPath $vmPath -MemoryGB $MemoryGB -ProcessorCount $vCPUs -AdapterDefinitions @(
+    @{ Name = 'Storage1'; SwitchName = 'vSwitch-Storage' },
+    @{ Name = 'Storage2'; SwitchName = 'vSwitch-Storage' },
+    @{ Name = 'Mgmt'; SwitchName = 'vSwitch-Mgmt' }
+) -DataVhdPaths $dataVhdPaths | Out-Null
+
+Initialize-HVLabGuestNetwork -VMName $VMName -Credential $bootstrapCredential -AdapterConfigurations @(
+    @{ Name = 'Storage1'; GuestName = 'Storage1'; IPAddress = $StorageIP1; PrefixLength = 24; Gateway = ''; DnsServers = @() },
+    @{ Name = 'Storage2'; GuestName = 'Storage2'; IPAddress = $StorageIP2; PrefixLength = 24; Gateway = ''; DnsServers = @() },
+    @{ Name = 'Mgmt'; GuestName = 'Mgmt'; IPAddress = $MgmtIP; PrefixLength = $MgmtPrefixLen; Gateway = $MgmtGateway; DnsServers = @($MgmtDnsServer) }
+)
+
+$domainCredential = New-Object System.Management.Automation.PSCredential(
+    "$DomainJoinUser@$DomainFqdn",
+    $bootstrapCredential.Password
+)
+
+Join-HVLabGuestToDomain -VMName $VMName -LocalCredential $bootstrapCredential -DomainFqdn $DomainFqdn -DomainCredential $domainCredential -DnsServers @($MgmtDnsServer)
+
+Write-Host "hviscsi01 is imaged, booted, and joined to $DomainFqdn."
+Write-Host "Run configure/01-configure-iscsi.ps1 to initialize disks and publish the LUNs."
