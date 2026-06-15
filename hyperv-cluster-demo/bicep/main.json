@@ -1,0 +1,394 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "17015140196750226952"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus",
+      "metadata": {
+        "description": "Azure region for all resources"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_M32ms",
+      "allowedValues": [
+        "Standard_M32ms",
+        "Standard_E48ds_v5",
+        "Standard_E104ids_v5",
+        "Standard_E96ds_v5",
+        "Standard_E64ds_v5"
+      ],
+      "metadata": {
+        "description": "VM size — must support nested virtualization. M32ms = 32 vCPU / 875 GB / fits MS Family quota"
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "hvlabadmin",
+      "metadata": {
+        "description": "Admin username for the host VM"
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin password for the host VM — sourced from Key Vault"
+      }
+    }
+  },
+  "variables": {
+    "vmName": "vm-hvlab-host01-eus-01",
+    "nicName": "nic-hvlab-host01-eus-01",
+    "pipName": "pip-hvlab-host01-eus-01",
+    "nsgName": "nsg-hvlab-host01-eus-01",
+    "vnetName": "vnet-hvlab-mms26-eus-01",
+    "subnetName": "snet-hvlab-mms26-eus-01",
+    "osDiskName": "disk-hvlab-host01-os-eus-01",
+    "identityName": "mi-hvlab-host01-eus-01",
+    "storageAcctName": "sthvlabwitness01",
+    "vnetAddressPrefix": "10.250.2.0/24",
+    "subnetAddressPrefix": "10.250.2.0/27",
+    "primaryIp": "10.250.2.5",
+    "wacIp": "10.250.2.6",
+    "scvmmIp": "10.250.2.7",
+    "tags": {
+      "environment": "lab",
+      "workload": "hvlab-mms26",
+      "owner": "kristopherjturner",
+      "costCenter": "tplabs-demo",
+      "demoEvent": "mms-moa-2026",
+      "createdBy": "bicep",
+      "repo": "thisismydemo/mms_2026_hybrid_demo"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('vnetName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetAddressPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2023-01-31",
+      "name": "[variables('identityName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]"
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2023-01-01",
+      "name": "[variables('storageAcctName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "supportsHttpsTrafficOnly": true
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('nsgName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "AllowRDP-VNet",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "3389",
+              "description": "RDP from VNet only"
+            }
+          },
+          {
+            "name": "AllowWinRM-VNet",
+            "properties": {
+              "priority": 110,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "5985-5986",
+              "description": "WinRM from VNet only"
+            }
+          },
+          {
+            "name": "AllowHTTPS-VNet",
+            "properties": {
+              "priority": 120,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourceAddressPrefix": "VirtualNetwork",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "443",
+              "description": "HTTPS for WAC vmode access from VNet"
+            }
+          },
+          {
+            "name": "DenyAllInbound",
+            "properties": {
+              "priority": 4096,
+              "direction": "Inbound",
+              "access": "Deny",
+              "protocol": "*",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "*",
+              "description": "Deny all other inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('pipName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "sku": {
+        "name": "Standard",
+        "tier": "Regional"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static"
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('nicName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "properties": {
+        "enableIPForwarding": true,
+        "enableAcceleratedNetworking": true,
+        "ipConfigurations": [
+          {
+            "name": "ipconfig-primary",
+            "properties": {
+              "primary": true,
+              "privateIPAddress": "[variables('primaryIp')]",
+              "privateIPAllocationMethod": "Static",
+              "subnet": {
+                "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), variables('subnetName'))]"
+              },
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('pipName'))]"
+              }
+            }
+          },
+          {
+            "name": "ipconfig-hvwac01",
+            "properties": {
+              "primary": false,
+              "privateIPAddress": "[variables('wacIp')]",
+              "privateIPAllocationMethod": "Static",
+              "subnet": {
+                "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), variables('subnetName'))]"
+              }
+            }
+          },
+          {
+            "name": "ipconfig-hvscvmm01",
+            "properties": {
+              "primary": false,
+              "privateIPAddress": "[variables('scvmmIp')]",
+              "privateIPAllocationMethod": "Static",
+              "subnet": {
+                "id": "[format('{0}/subnets/{1}', resourceId('Microsoft.Network/virtualNetworks', variables('vnetName')), variables('subnetName'))]"
+              }
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('pipName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('vmName')]",
+      "location": "[parameters('location')]",
+      "tags": "[variables('tags')]",
+      "identity": {
+        "type": "UserAssigned",
+        "userAssignedIdentities": {
+          "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('identityName')))]": {}
+        }
+      },
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "hvlabhost01",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "enableAutomaticUpdates": false,
+            "patchSettings": {
+              "patchMode": "Manual"
+            },
+            "timeZone": "Central Standard Time"
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "2022-datacenter-g2",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[variables('osDiskName')]",
+            "createOption": "FromImage",
+            "diskSizeGB": 256,
+            "managedDisk": {
+              "storageAccountType": "Premium_LRS"
+            },
+            "caching": "ReadWrite"
+          },
+          "dataDisks": [
+            {
+              "lun": 0,
+              "name": "disk-hvlab-host01-data-eus-01",
+              "createOption": "Empty",
+              "diskSizeGB": 1024,
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              },
+              "caching": "ReadOnly"
+            },
+            {
+              "lun": 1,
+              "name": "disk-hvlab-host01-data-eus-02",
+              "createOption": "Empty",
+              "diskSizeGB": 1024,
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              },
+              "caching": "ReadOnly"
+            },
+            {
+              "lun": 2,
+              "name": "disk-hvlab-host01-data-eus-03",
+              "createOption": "Empty",
+              "diskSizeGB": 1024,
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              },
+              "caching": "ReadOnly"
+            },
+            {
+              "lun": 3,
+              "name": "disk-hvlab-host01-data-eus-04",
+              "createOption": "Empty",
+              "diskSizeGB": 1024,
+              "managedDisk": {
+                "storageAccountType": "Premium_LRS"
+              },
+              "caching": "ReadOnly"
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('identityName'))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "vmResourceId": {
+      "type": "string",
+      "value": "[resourceId('Microsoft.Compute/virtualMachines', variables('vmName'))]"
+    },
+    "vmName": {
+      "type": "string",
+      "value": "[variables('vmName')]"
+    },
+    "publicIpAddress": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses', variables('pipName')), '2023-09-01').ipAddress]"
+    },
+    "privateIpAddress": {
+      "type": "string",
+      "value": "[variables('primaryIp')]"
+    },
+    "identityClientId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('identityName')), '2023-01-31').clientId]"
+    },
+    "identityPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', variables('identityName')), '2023-01-31').principalId]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('storageAcctName')]"
+    }
+  }
+}
