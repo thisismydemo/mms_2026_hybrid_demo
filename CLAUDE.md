@@ -53,7 +53,7 @@ Key rules:
 | `AZURE_DEVOPS_EXT_PAT` | kv-hcs-vault-01 via Load-HCSEnvironment.ps1 | ADO CLI (`az boards`, `az devops`) |
 Load before starting a session:
 ```powershell
-. E:\git\platform\scripts\Load-HCSEnvironment.ps1
+. D:\git\platform\scripts\Load-HCSEnvironment.ps1
 ```
 
 ### Build and test commands
@@ -140,9 +140,11 @@ mms_2026_hybrid_demo/
 
 ## Subagents available in this repo
 
-- `mms_2026_hybrid_demo-engineer` (model: sonnet) — Expert in `mms_2026_hybrid_demo`: deep knowledge of this repo's structure, conventions, and development workflow.
+- `mms_2026_hybrid_demo-engineer` (model: sonnet) — Demo engineer for MMS 2026 Hybrid Update Blues session: Bicep templates, demo scripts, presenter materials.
 
-User-level agents (available in every repo session): `triage-lookup`, `markdown-prose-editor`, `azurelocal-domain-expert`, `mkdocs-material-doctor`, `turner-module-scaffold-engineer`, `mms-2026-demo-presenter`.
+User-level agents (every repo): `triage-lookup`, `markdown-prose-editor`, `azurelocal-domain-expert`, `mkdocs-material-doctor`, `turner-module-scaffold-engineer`, `mms-2026-demo-presenter`.
+
+Platform repo agents (when working in `D:\git\platform`): `orchestration-pm`, `security-waf-caf`, `terraform-validator`, `bicep-validator`, `arm-validator`, `ansible-linter`, `powershell-linter`, `reviewer`, `security-reviewer`, `documenter`, `coder`, `planner`, `operator`, `investigator`, `test-writer`, `router`.
 
 ---
 
@@ -153,3 +155,15 @@ kris@hybridsolutions.cloud
 Senior Product Technology Architect, TierPoint | Microsoft MVP (Azure) | MCT
 Owner, Hybrid Cloud Solutions LLC — hybridsolutions.cloud
 Country Cloud Boy — thisismydemo.cloud
+
+---
+
+## HCS Orchestration Profile
+
+**Validation profile:** iac-bicep — see `D:\git\platform\profiles\iac-bicep.yaml`
+
+This repo is a **pilot** for the `iac-bicep` type in the HCS multi-agent orchestration system.
+Run `/dispatch iac-bicep` (or `/dispatch` for all pilots) to validate this repo.
+
+**Repo-specific notes for validators:**
+Entry point: hyperv-cluster-demo/bicep/main.bicep. az bicep build and PSRule.Rules.Azure must pass.
